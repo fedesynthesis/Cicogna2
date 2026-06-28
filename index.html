@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#7cb98a" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="Cicogna" />
+<title>Cicogna · Lista nascita</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" type="image/png" sizes="32x32" href="icon-32.png" />
+<link rel="apple-touch-icon" href="icon-180.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#eef7ef;
+    --bg2:#e0f0e3;
+    --surface:#ffffff;
+    --ink:#26342a;
+    --ink-soft:#6a7d70;
+    --line:#dceadf;
+    --periwinkle:#6cb47e;        /* verde principale */
+    --periwinkle-soft:#a3d5b0;   /* verde chiaro */
+    --butter:#f4cd78;
+    --sage:#4fa269;
+    --sage-bg:#e6f4ea;
+    --coral:#ef9a85;
+    --shadow:0 10px 30px -16px rgba(45,82,58,.4);
+    --shadow-soft:0 4px 14px -8px rgba(45,82,58,.35);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:'Inter',system-ui,-apple-system,sans-serif;
+    color:var(--ink);
+    background:
+      radial-gradient(120% 60% at 50% -10%, var(--bg2) 0%, var(--bg) 55%) fixed;
+    min-height:100dvh;
+    -webkit-font-smoothing:antialiased;
+    padding:0 0 96px;
+  }
+  .wrap{max-width:560px;margin:0 auto;padding:0 18px}
+
+  /* ---------- Header ---------- */
+  header{
+    position:relative;
+    padding:calc(env(safe-area-inset-top) + 26px) 18px 22px;
+    text-align:center;
+    overflow:hidden;
+  }
+  .stars{position:absolute;inset:0;pointer-events:none;opacity:.55}
+  .stars span{position:absolute;width:3px;height:3px;border-radius:50%;background:var(--periwinkle-soft);
+    animation:twinkle 4s ease-in-out infinite}
+  @keyframes twinkle{0%,100%{opacity:.2;transform:scale(.8)}50%{opacity:.9;transform:scale(1.2)}}
+  .logo{
+    width:84px;height:84px;margin:0 auto 6px;border-radius:28px;
+    background:radial-gradient(circle at 38% 30%, #ffffff 0%, #eafaee 55%, #d8f0de 100%);
+    box-shadow:0 0 0 7px rgba(124,185,138,.14), var(--shadow-soft);
+    display:grid;place-items:center;
+    animation:bob 4.5s ease-in-out infinite;
+  }
+  @keyframes bob{0%,100%{transform:translateY(0) rotate(-1.5deg)}50%{transform:translateY(-5px) rotate(1.5deg)}}
+  .logo svg{width:60px;height:60px;overflow:visible}
+  .bundle{transform-origin:74px 23px;animation:swing 3.2s ease-in-out infinite}
+  @keyframes swing{0%,100%{transform:rotate(-7deg)}50%{transform:rotate(7deg)}}
+  h1{font-family:'Quicksand';font-weight:700;font-size:30px;letter-spacing:.5px;margin:0;color:var(--ink)}
+  .subtitle{margin:4px 0 0;color:var(--ink-soft);font-size:14px}
+
+  /* ---------- Overall progress ---------- */
+  .overall{
+    margin:18px auto 4px;background:var(--surface);border-radius:22px;
+    padding:18px 20px;box-shadow:var(--shadow);border:1px solid var(--line);
+    display:flex;align-items:center;gap:16px;
+  }
+  .ring{position:relative;width:64px;height:64px;flex:0 0 auto}
+  .ring svg{transform:rotate(-90deg)}
+  .ring .track{stroke:var(--line)}
+  .ring .fill{stroke:var(--sage);stroke-linecap:round;transition:stroke-dashoffset .6s cubic-bezier(.4,0,.2,1)}
+  .ring .pct{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    font-family:'Quicksand';font-weight:700;font-size:16px;color:var(--ink)}
+  .overall .meta strong{font-family:'Quicksand';font-weight:600;font-size:16px;display:block}
+  .overall .meta span{color:var(--ink-soft);font-size:13px}
+
+  /* ---------- Phase filter ---------- */
+  .phases{display:flex;gap:8px;overflow-x:auto;padding:18px 18px 4px;margin:0 -18px;
+    scrollbar-width:none}
+  .phases::-webkit-scrollbar{display:none}
+  .wrap .phases{padding-left:0;padding-right:0;margin:18px 0 4px}
+  .chip{
+    flex:0 0 auto;border:1px solid var(--line);background:var(--surface);
+    color:var(--ink-soft);font-family:'Quicksand';font-weight:600;font-size:13.5px;
+    padding:9px 15px;border-radius:999px;cursor:pointer;transition:.18s;white-space:nowrap;
+  }
+  .chip.active{background:var(--periwinkle);color:#fff;border-color:var(--periwinkle);
+    box-shadow:var(--shadow-soft)}
+
+  /* ---------- Category card ---------- */
+  .cat{background:var(--surface);border-radius:22px;margin:14px 0;box-shadow:var(--shadow-soft);
+    border:1px solid var(--line);overflow:hidden}
+  .cat-head{display:flex;align-items:center;gap:13px;padding:16px 18px;cursor:pointer;user-select:none}
+  .cat-emoji{font-size:24px;width:42px;height:42px;display:grid;place-items:center;flex:0 0 auto;
+    background:var(--bg);border-radius:14px}
+  .cat-title{flex:1;min-width:0}
+  .cat-title h2{margin:0;font-family:'Quicksand';font-weight:600;font-size:17px;line-height:1.2}
+  .cat-bar{height:5px;border-radius:99px;background:var(--line);margin-top:7px;overflow:hidden}
+  .cat-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--sage),#a6cdac);
+    border-radius:99px;transition:width .5s ease}
+  .cat-count{font-family:'Quicksand';font-weight:600;font-size:13px;color:var(--ink-soft);flex:0 0 auto}
+  .chev{flex:0 0 auto;color:var(--periwinkle-soft);transition:transform .25s;margin-left:2px}
+  .cat.open .chev{transform:rotate(180deg)}
+
+  .items{max-height:0;overflow:hidden;transition:max-height .35s ease}
+  .cat.open .items{max-height:2600px}
+  ul{list-style:none;margin:0;padding:2px 12px 10px}
+  li{display:flex;align-items:center;gap:12px;padding:11px 8px;border-radius:14px;transition:background .15s}
+  li:active{background:var(--bg)}
+  .check{flex:0 0 auto;width:26px;height:26px;border-radius:9px;border:2px solid var(--line);
+    display:grid;place-items:center;cursor:pointer;transition:.18s;background:#fff}
+  .check.on{background:var(--sage);border-color:var(--sage)}
+  .check svg{opacity:0;transform:scale(.5);transition:.18s;color:#fff}
+  .check.on svg{opacity:1;transform:scale(1)}
+  .label{flex:1;font-size:15px;line-height:1.3;cursor:pointer}
+  li.done .label{color:var(--ink-soft);text-decoration:line-through;text-decoration-color:var(--sage)}
+  .qty{font-size:12px;font-family:'Quicksand';font-weight:600;color:var(--periwinkle);
+    background:#e7f4ec;padding:2px 8px;border-radius:99px;flex:0 0 auto}
+  .stepper{display:flex;align-items:center;gap:3px;flex:0 0 auto;background:var(--bg);
+    border-radius:12px;padding:3px}
+  .step{width:28px;height:28px;border:none;background:#fff;color:var(--periwinkle);
+    border-radius:9px;font-size:19px;font-family:'Quicksand';font-weight:700;cursor:pointer;
+    display:grid;place-items:center;line-height:1;box-shadow:var(--shadow-soft);transition:transform .12s}
+  .step:active{transform:scale(.86)}
+  .cnt{min-width:46px;text-align:center;font-family:'Quicksand';font-weight:700;font-size:15px;color:var(--ink)}
+  .cnt i{font-style:normal;color:var(--ink-soft);font-weight:600;font-size:12px}
+  li.done .cnt{color:var(--sage)}
+  .del{flex:0 0 auto;border:none;background:none;color:var(--line);cursor:pointer;padding:4px;
+    display:grid;place-items:center;transition:color .15s}
+  li:active .del{color:var(--coral)}
+
+  .add{display:flex;gap:8px;padding:4px 12px 14px}
+  .add input{flex:1;border:1px solid var(--line);background:var(--bg);border-radius:13px;
+    padding:11px 14px;font-size:15px;font-family:inherit;color:var(--ink);outline:none}
+  .add input:focus{border-color:var(--periwinkle-soft);background:#fff}
+  .add button{border:none;background:var(--periwinkle);color:#fff;border-radius:13px;width:46px;
+    font-size:22px;cursor:pointer;flex:0 0 auto;font-family:'Quicksand'}
+
+  /* ---------- Footer actions ---------- */
+  .foot{position:fixed;left:0;right:0;bottom:0;padding:12px 18px calc(env(safe-area-inset-bottom) + 12px);
+    background:linear-gradient(180deg,transparent,var(--bg) 40%);display:flex;justify-content:center;gap:10px}
+  .foot button{border:1px solid var(--line);background:var(--surface);color:var(--ink-soft);
+    font-family:'Quicksand';font-weight:600;font-size:13.5px;padding:11px 18px;border-radius:999px;
+    cursor:pointer;box-shadow:var(--shadow-soft)}
+  .foot button.primary{background:var(--periwinkle);color:#fff;border-color:var(--periwinkle)}
+
+  .toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%) translateY(20px);
+    background:var(--ink);color:#fff;padding:11px 18px;border-radius:14px;font-size:14px;
+    font-family:'Quicksand';font-weight:600;opacity:0;pointer-events:none;transition:.3s;z-index:9}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  .note{text-align:center;color:var(--ink-soft);font-size:12.5px;margin:18px 0 6px;line-height:1.5}
+</style>
+</head>
+<body>
+  <header>
+    <div class="stars" id="stars"></div>
+    <div class="logo">
+      <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- gambe -->
+        <line x1="30" y1="52" x2="29" y2="66" stroke="#f2a35d" stroke-width="2.4" stroke-linecap="round"/>
+        <line x1="38" y1="53" x2="39" y2="67" stroke="#f2a35d" stroke-width="2.4" stroke-linecap="round"/>
+        <path d="M26 66h6M36 67h6" stroke="#f2a35d" stroke-width="2.4" stroke-linecap="round"/>
+        <!-- corpo -->
+        <ellipse cx="33" cy="42" rx="17" ry="12.5" fill="#ffffff" stroke="#d7e9db" stroke-width="1.5"/>
+        <!-- coda -->
+        <path d="M17 40c-7-2-11 1-12 4 4 0 9 1 12-1z" fill="#eaf6ed" stroke="#d7e9db" stroke-width="1.2"/>
+        <!-- ala -->
+        <path d="M24 36c8 0 17 3 22 8-7 3-17 3-24-2 0-3 1-5 2-6z" fill="#cfe9d6"/>
+        <!-- collo + testa -->
+        <path d="M42 34c2-7 5-12 11-15" stroke="#ffffff" stroke-width="7" stroke-linecap="round"/>
+        <path d="M42 34c2-7 5-12 11-15" stroke="#d7e9db" stroke-width="7" stroke-linecap="round" stroke-opacity=".0"/>
+        <circle cx="55" cy="18" r="8" fill="#ffffff" stroke="#d7e9db" stroke-width="1.5"/>
+        <circle cx="57.5" cy="16.5" r="1.8" fill="#2b3a30"/>
+        <!-- becco -->
+        <path d="M62 17 L77 24 L62 22 Z" fill="#f2a35d"/>
+        <!-- fagottino -->
+        <g class="bundle">
+          <line x1="74" y1="23.5" x2="63" y2="44" stroke="#cdbf9a" stroke-width="1.6" stroke-linecap="round"/>
+          <circle cx="61" cy="51" r="10" fill="#f7d98a"/>
+          <path d="M61 51c-3-2-3-6 0-8 3 2 3 6 0 8z" fill="#fff" fill-opacity=".45"/>
+          <path d="M57 43c1.5-2 6.5-2 8 0-1.5 1.5-6.5 1.5-8 0z" fill="#f2a35d"/>
+          <circle cx="58" cy="52" r="1.3" fill="#e7b85f"/>
+          <circle cx="64" cy="50" r="1.3" fill="#e7b85f"/>
+        </g>
+      </svg>
+    </div>
+    <h1>Cicogna</h1>
+    <p class="subtitle">La lista per l'arrivo del bebè</p>
+  </header>
+
+  <div class="wrap">
+    <div class="overall">
+      <div class="ring">
+        <svg width="64" height="64" viewBox="0 0 64 64">
+          <circle class="track" cx="32" cy="32" r="27" fill="none" stroke-width="7"/>
+          <circle class="fill" id="ringFill" cx="32" cy="32" r="27" fill="none" stroke-width="7"
+            stroke-dasharray="169.6" stroke-dashoffset="169.6"/>
+        </svg>
+        <div class="pct" id="ringPct">0%</div>
+      </div>
+      <div class="meta">
+        <strong id="metaTitle">Iniziamo a preparare il nido</strong>
+        <span id="metaSub">0 articoli su 0 pronti</span>
+      </div>
+    </div>
+
+    <div class="phases" id="phases"></div>
+    <div id="list"></div>
+
+    <p class="note">Tocca un articolo per spuntarlo · tieni premuto il cestino per eliminarlo<br>
+      Tutto resta salvato su questo dispositivo 🌿</p>
+  </div>
+
+  <div class="foot">
+    <button id="collapseBtn">Comprimi tutto</button>
+    <button class="primary" id="hideDoneBtn">Nascondi presi</button>
+  </div>
+  <div class="toast" id="toast"></div>
+
+<script>
+/* ---------------- Dati lista nascita ---------------- */
+const DEFAULT = [
+  {id:"hosp_mamma", emoji:"🏥", phase:"ospedale", name:"Borsa ospedale · mamma", items:[
+    ["Documenti: tessera sanitaria, carta d'identità, piano del parto"],
+    ["Camicie da notte aperte davanti","2-3"],
+    ["Vestaglia leggera"],["Ciabatte lavabili"],
+    ["Reggiseni per allattamento","2"],["Coppette assorbilatte"],
+    ["Slip a rete monouso"],["Assorbenti post-parto"],
+    ["Necessaire: spazzolino, dentifricio, detergente"],["Asciugamani","2"],
+    ["Elastico/fermacapelli"],["Spuntini + borraccia"],["Caricabatterie lungo"]
+  ]},
+  {id:"hosp_bebe", emoji:"👶", phase:"ospedale", name:"Borsa ospedale · bebè", items:[
+    ["Body manica lunga 0-1 mese","4-5"],["Tutine in ciniglia/cotone","4-5"],
+    ["Cuffietta in cotone"],["Calzini neonato","3 paia"],
+    ["Sacco nascita o copertina"],["Bavaglini","3"],
+    ["Pannolini taglia 1","1 pacco"],["Salviette delicate"],
+    ["Crema cambio (pasta protettiva)"],["Garze sterili"],
+    ["Tutina per l'uscita"]
+  ]},
+  {id:"cameretta", emoji:"🛏️", phase:"casa", name:"Cameretta & sonno", items:[
+    ["Culla o lettino"],["Materasso rigido a misura"],
+    ["Coprimaterasso impermeabile","2"],["Lenzuola con angoli","2-3 set"],
+    ["Sacco nanna 0-6 mesi"],["Baby monitor"],
+    ["Fasciatoio o materassino fasciatoio"],["Contenitore pannolini"],
+    ["Luce notturna soffusa"]
+  ]},
+  {id:"allatt", emoji:"🍼", phase:"casa", name:"Allattamento & poppata", items:[
+    ["Cuscino per allattamento"],["Coppette assorbilatte"],
+    ["Crema alla lanolina per capezzoli"],["Biberon","1-2"],
+    ["Scovolino per biberon"],["Sterilizzatore o pastiglie"],
+    ["Tiralatte (se necessario)"],["Bavaglini in spugna","4-5"]
+  ]},
+  {id:"cambio", emoji:"🧷", phase:"casa", name:"Cambio & igiene", items:[
+    ["Pannolini taglia 1","2 pacchi"],["Pannolini taglia 2","1 pacco"],
+    ["Salviette delicate"],["Crema cambio / pasta all'ossido di zinco"],
+    ["Garze in cotone"],["Detergente delicato corpo e capelli"],
+    ["Vaschetta per il bagnetto"],["Termometro da bagnetto"],
+    ["Accappatoio con cappuccio"],["Forbicine punte arrotondate"],
+    ["Aspiratore nasale"],["Soluzione fisiologica (flaconcini)"]
+  ]},
+  {id:"corredino", emoji:"👕", phase:"preparto", name:"Corredino 0-3 mesi", items:[
+    ["Body manica lunga","6-7"],["Body manica corta","4-5"],
+    ["Tutine intere","6-7"],["Golfino o giacchina","2"],
+    ["Cappellino in cotone"],["Scarpine morbide / calzini","3 paia"],
+    ["Sacco copertina per uscita"],["Bavaglini","5-6"]
+  ]},
+  {id:"giro", emoji:"🚗", phase:"preparto", name:"In giro", items:[
+    ["Ovetto/seggiolino auto gruppo 0+ omologato"],["Passeggino o trio"],
+    ["Fascia o marsupio ergonomico"],["Borsa fasciatoio da viaggio"],
+    ["Parapioggia / coprigambe passeggino"]
+  ]},
+  {id:"farmacia", emoji:"💊", phase:"casa", name:"Farmacia & salute", items:[
+    ["Termometro digitale"],["Soluzione fisiologica"],
+    ["Crema lenitiva / barriera"],["Numero pediatra salvato"],
+    ["Disinfettante delicato per moncone ombelicale"]
+  ]},
+  {id:"postparto", emoji:"💆", phase:"postparto", name:"Postparto · mamma", items:[
+    ["Assorbenti post-parto / slip a rete"],["Reggiseni allattamento comodi"],
+    ["Crema alla lanolina"],["Cuscino a ciambella (se episiotomia/cesareo)"],
+    ["Tisane o integratori consigliati"],["Pasti pronti / congelati di scorta"],
+    ["Borraccia grande sempre a portata"]
+  ]}
+];
+
+const PHASES = [
+  {id:"all", label:"Tutto"},
+  {id:"preparto", label:"Preparto"},
+  {id:"ospedale", label:"Per l'ospedale"},
+  {id:"casa", label:"Neonato & casa"},
+  {id:"postparto", label:"Postparto"}
+];
+
+/* ---------------- Stato persistente ---------------- */
+const KEY="cicogna_v1";
+let mem=null; // fallback se localStorage non disponibile (es. anteprima)
+function load(){
+  try{const r=localStorage.getItem(KEY);return r?JSON.parse(r):null;}
+  catch(e){return mem;}
+}
+function save(s){
+  try{localStorage.setItem(KEY,JSON.stringify(s));}
+  catch(e){mem=s;}
+}
+let state = load() || {checked:{},custom:{},removed:{},openCats:{},hideDone:false};
+state.checked=state.checked||{}; state.custom=state.custom||{};
+state.removed=state.removed||{}; state.openCats=state.openCats||{};
+state.counts=state.counts||{};
+
+let activePhase="all";
+
+/* ---------------- Costruzione liste effettive ---------------- */
+function catItems(cat){
+  const base=cat.items
+    .map(it=>({text:it[0],qty:it[1]||null,key:cat.id+"::"+it[0]}))
+    .filter(it=>!state.removed[it.key]);
+  const custom=(state.custom[cat.id]||[])
+    .map(t=>({text:t,qty:null,key:cat.id+"::"+t,custom:true}));
+  return base.concat(custom);
+}
+
+/* min richiesto da una stringa quantità (es. "6-7"->6, "2 pacchi"->2). null se non numerica */
+function qtyMin(s){
+  if(!s) return null;
+  const m=String(s).match(/\d+/g);
+  return m ? parseInt(m[0],10) : null;
+}
+function itemDone(it){
+  const min=qtyMin(it.qty);
+  if(min!=null) return (state.counts[it.key]||0) >= min;
+  return !!state.checked[it.key];
+}
+
+/* ---------------- Rendering ---------------- */
+const listEl=document.getElementById("list");
+const phasesEl=document.getElementById("phases");
+
+function buildPhases(){
+  phasesEl.innerHTML="";
+  PHASES.forEach(p=>{
+    const b=document.createElement("button");
+    b.className="chip"+(p.id===activePhase?" active":"");
+    b.textContent=p.label;
+    b.onclick=()=>{activePhase=p.id;buildPhases();render();};
+    phasesEl.appendChild(b);
+  });
+}
+
+function render(){
+  listEl.innerHTML="";
+  let totAll=0, doneAll=0;
+
+  DEFAULT.forEach(cat=>{
+    const items=catItems(cat);
+    const done=items.filter(itemDone).length;
+    totAll+=items.length; doneAll+=done;
+
+    if(activePhase!=="all" && cat.phase!==activePhase) return;
+    if(items.length===0 && !(state.custom[cat.id]||[]).length) {/* still show to allow adding */}
+
+    const open = state.openCats[cat.id] ?? (done<items.length && items.length>0);
+    const pct = items.length? Math.round(done/items.length*100):0;
+
+    const card=document.createElement("section");
+    card.className="cat"+(open?" open":"");
+
+    const head=document.createElement("div");
+    head.className="cat-head";
+    head.innerHTML=`
+      <div class="cat-emoji">${cat.emoji}</div>
+      <div class="cat-title">
+        <h2>${cat.name}</h2>
+        <div class="cat-bar"><i style="width:${pct}%"></i></div>
+      </div>
+      <div class="cat-count">${done}/${items.length}</div>
+      <div class="chev">${chevSvg()}</div>`;
+    head.onclick=()=>{state.openCats[cat.id]=!open;save(state);render();};
+    card.appendChild(head);
+
+    const wrap=document.createElement("div");
+    wrap.className="items";
+
+    const ul=document.createElement("ul");
+    let visible=items;
+    if(state.hideDone) visible=items.filter(it=>!itemDone(it));
+    visible.forEach(it=>{
+      const min=qtyMin(it.qty);
+      const counted=min!=null;
+      const count=counted?(state.counts[it.key]||0):0;
+      const on=itemDone(it);
+      const li=document.createElement("li");
+      if(on) li.className="done";
+
+      let right;
+      if(counted){
+        right=`<div class="stepper">
+            <button class="step minus" title="Meno">−</button>
+            <span class="cnt">${count}<i>/${escapeHtml(it.qty)}</i></span>
+            <button class="step plus" title="Più">+</button>
+          </div>`;
+      } else {
+        right = it.qty?`<span class="qty">${escapeHtml(it.qty)}</span>`:"";
+      }
+
+      li.innerHTML=`
+        <div class="check${on?" on":""}">${checkSvg()}</div>
+        <span class="label">${escapeHtml(it.text)}</span>
+        ${right}
+        <button class="del" title="Elimina">${trashSvg()}</button>`;
+
+      // tocco su check/label
+      const toggle=(e)=>{
+        e.stopPropagation();
+        if(counted){
+          state.counts[it.key]= on ? 0 : min;   // completa o azzera
+        } else {
+          state.checked[it.key]=!on;
+        }
+        save(state); render();
+      };
+      li.querySelector(".check").onclick=toggle;
+      li.querySelector(".label").onclick=toggle;
+
+      if(counted){
+        li.querySelector(".plus").onclick=(e)=>{
+          e.stopPropagation();
+          state.counts[it.key]=Math.min(99,(state.counts[it.key]||0)+1);
+          save(state); render();
+        };
+        li.querySelector(".minus").onclick=(e)=>{
+          e.stopPropagation();
+          state.counts[it.key]=Math.max(0,(state.counts[it.key]||0)-1);
+          save(state); render();
+        };
+      }
+
+      li.querySelector(".del").onclick=(e)=>{
+        e.stopPropagation();
+        if(it.custom){
+          state.custom[cat.id]=(state.custom[cat.id]||[]).filter(t=>t!==it.text);
+        } else {
+          state.removed[it.key]=true;
+        }
+        delete state.checked[it.key];
+        delete state.counts[it.key];
+        save(state); render(); toast("Articolo rimosso");
+      };
+      ul.appendChild(li);
+    });
+    wrap.appendChild(ul);
+
+    // add row
+    const add=document.createElement("div");
+    add.className="add";
+    add.innerHTML=`<input type="text" placeholder="Aggiungi a ${cat.name.toLowerCase()}…" />
+      <button title="Aggiungi">+</button>`;
+    const inp=add.querySelector("input");
+    const addFn=()=>{
+      const v=inp.value.trim(); if(!v) return;
+      state.custom[cat.id]=state.custom[cat.id]||[];
+      if(!state.custom[cat.id].includes(v)) state.custom[cat.id].push(v);
+      inp.value=""; save(state); render();
+    };
+    add.querySelector("button").onclick=addFn;
+    inp.addEventListener("keydown",e=>{if(e.key==="Enter")addFn();});
+    wrap.appendChild(add);
+
+    card.appendChild(wrap);
+    listEl.appendChild(card);
+  });
+
+  // overall ring
+  const pctAll=totAll?Math.round(doneAll/totAll*100):0;
+  const circ=169.6;
+  document.getElementById("ringFill").style.strokeDashoffset=circ-(circ*pctAll/100);
+  document.getElementById("ringPct").textContent=pctAll+"%";
+  document.getElementById("metaSub").textContent=`${doneAll} articoli su ${totAll} pronti`;
+  const t=document.getElementById("metaTitle");
+  t.textContent = pctAll===0?"Iniziamo a preparare il nido"
+    : pctAll<40?"Si parte, un passo alla volta"
+    : pctAll<80?"Il nido prende forma 🪺"
+    : pctAll<100?"Ci siamo quasi!"
+    : "Tutto pronto per il bebè 💛";
+}
+
+/* ---------------- Azioni footer ---------------- */
+document.getElementById("collapseBtn").onclick=function(){
+  const anyOpen=DEFAULT.some(c=>state.openCats[c.id]);
+  DEFAULT.forEach(c=>state.openCats[c.id]=anyOpen?false:true);
+  this.textContent=anyOpen?"Espandi tutto":"Comprimi tutto";
+  save(state); render();
+};
+document.getElementById("hideDoneBtn").onclick=function(){
+  state.hideDone=!state.hideDone;
+  this.textContent=state.hideDone?"Mostra presi":"Nascondi presi";
+  this.classList.toggle("primary",state.hideDone);
+  save(state); render();
+};
+
+/* ---------------- Util ---------------- */
+function toast(msg){const t=document.getElementById("toast");t.textContent=msg;
+  t.classList.add("show");clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("show"),1600);}
+function escapeHtml(s){return s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+function checkSvg(){return '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';}
+function chevSvg(){return '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';}
+function trashSvg(){return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';}
+
+/* stelle decorative */
+(function(){const s=document.getElementById("stars");const pos=[[12,30],[28,18],[46,40],[64,22],[80,34],[88,16],[20,50],[72,52]];
+  pos.forEach(([x,y],i)=>{const e=document.createElement("span");e.style.left=x+"%";e.style.top=y+"%";
+    e.style.animationDelay=(i*0.5)+"s";s.appendChild(e);});})();
+
+buildPhases();
+render();
+
+/* ---------------- PWA: service worker ---------------- */
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
