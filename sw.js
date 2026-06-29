@@ -1,6 +1,6 @@
 /* Cicogna — service worker
    Cache-first per la app shell, network-first con fallback per il resto. */
-const CACHE = "cicogna-v2";
+const CACHE = "cicogna-v5";
 const ASSETS = [
   "./",
   "./index.html",

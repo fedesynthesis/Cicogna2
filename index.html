@@ -84,6 +84,14 @@
   .overall .meta strong{font-family:'Quicksand';font-weight:600;font-size:16px;display:block}
   .overall .meta span{color:var(--ink-soft);font-size:13px}
 
+  /* ---------- Macro switch ---------- */
+  .macro{display:flex;gap:6px;background:var(--surface);border:1px solid var(--line);
+    border-radius:18px;padding:5px;box-shadow:var(--shadow-soft);margin:18px 0 2px}
+  .macro button{flex:1;border:none;background:none;border-radius:13px;padding:12px 8px;
+    font-family:'Quicksand';font-weight:600;font-size:15px;color:var(--ink-soft);cursor:pointer;
+    transition:.18s;white-space:nowrap}
+  .macro button.active{background:var(--periwinkle);color:#fff;box-shadow:var(--shadow-soft)}
+
   /* ---------- Phase filter ---------- */
   .phases{display:flex;gap:8px;overflow-x:auto;padding:18px 18px 4px;margin:0 -18px;
     scrollbar-width:none}
@@ -135,16 +143,22 @@
   .cnt{min-width:46px;text-align:center;font-family:'Quicksand';font-weight:700;font-size:15px;color:var(--ink)}
   .cnt i{font-style:normal;color:var(--ink-soft);font-weight:600;font-size:12px}
   li.done .cnt{color:var(--sage)}
-  .del{flex:0 0 auto;border:none;background:none;color:var(--line);cursor:pointer;padding:4px;
-    display:grid;place-items:center;transition:color .15s}
-  li:active .del{color:var(--coral)}
+  .del{flex:0 0 auto;border:none;background:none;color:#bcccbf;cursor:pointer;padding:6px;
+    display:grid;place-items:center;transition:color .15s,transform .12s;border-radius:8px}
+  .del:hover{color:var(--coral)}
+  .del:active{color:var(--coral);transform:scale(.85)}
 
-  .add{display:flex;gap:8px;padding:4px 12px 14px}
-  .add input{flex:1;border:1px solid var(--line);background:var(--bg);border-radius:13px;
+  .add{display:flex;gap:8px;padding:10px 12px 6px;margin-top:4px;border-top:1px dashed var(--line)}
+  .add input{border:1px solid var(--line);background:var(--bg);border-radius:13px;
     padding:11px 14px;font-size:15px;font-family:inherit;color:var(--ink);outline:none}
+  .add .add-text{flex:1;min-width:0}
+  .add .add-qty{width:64px;flex:0 0 auto;text-align:center}
   .add input:focus{border-color:var(--periwinkle-soft);background:#fff}
-  .add button{border:none;background:var(--periwinkle);color:#fff;border-radius:13px;width:46px;
-    font-size:22px;cursor:pointer;flex:0 0 auto;font-family:'Quicksand'}
+  .add .add-btn{border:none;background:var(--periwinkle);color:#fff;border-radius:13px;width:46px;
+    font-size:22px;cursor:pointer;flex:0 0 auto;font-family:'Quicksand';padding:0}
+  .restore{margin:0 12px 12px;display:inline-flex;align-items:center;gap:6px;background:none;border:none;
+    color:var(--periwinkle);font-family:'Quicksand';font-weight:600;font-size:13px;cursor:pointer;padding:4px 6px}
+  .restore:active{opacity:.6}
 
   /* ---------- Footer actions ---------- */
   .foot{position:fixed;left:0;right:0;bottom:0;padding:12px 18px calc(env(safe-area-inset-bottom) + 12px);
@@ -215,6 +229,7 @@
       </div>
     </div>
 
+    <div class="macro" id="macro"></div>
     <div class="phases" id="phases"></div>
     <div id="list"></div>
 
@@ -290,16 +305,81 @@ const DEFAULT = [
     ["Crema alla lanolina"],["Cuscino a ciambella (se episiotomia/cesareo)"],
     ["Tisane o integratori consigliati"],["Pasti pronti / congelati di scorta"],
     ["Borraccia grande sempre a portata"]
+  ]},
+  {id:"dafare", emoji:"📋", phase:"generale", name:"Da fare & verificare", items:[
+    ["Chiedere al punto nascita la lista del corredo"],
+    ["Fare la pre-ospedalizzazione / accettazione"],
+    ["Scegliere il pediatra"],
+    ["Preparare il piano del parto"],
+    ["Montare e provare il seggiolino auto"],
+    ["Lavare body, tutine e lenzuola con detersivo delicato"],
+    ["Preparare la borsa per l'ospedale (entro la 36ª settimana)"],
+    ["Studiare il percorso per l'ospedale, anche di notte"],
+    ["Congelare qualche pasto pronto"],
+    ["Salvare i numeri utili: ospedale, pediatra, 112"],
+    ["Decidere chi avvisare durante il travaglio"],
+    ["Sistemare la cameretta e la zona cambio"]
+  ]},
+  {id:"compiti_fede", emoji:"👨", phase:"fede", name:"Compiti Fede", items:[
+    ["Montare culla, fasciatoio e cameretta"],
+    ["Installare il seggiolino in auto e provarlo"],
+    ["Tenere la borsa ospedale pronta in macchina"],
+    ["Studiare il percorso per l'ospedale, anche di notte"],
+    ["Seguire la burocrazia (congedo, dichiarazione nascita)"],
+    ["Montare e testare il baby monitor"],
+    ["Fare scorta di acqua e pasti pronti"]
+  ]},
+  {id:"compiti_sara", emoji:"👩", phase:"sara", name:"Compiti Sara", items:[
+    ["Preparare la borsa personale per l'ospedale"],
+    ["Definire il piano del parto"],
+    ["Scrivere le domande per ostetrica/ginecologo"],
+    ["Lavare e sistemare il corredino"],
+    ["Scegliere il pediatra"],
+    ["Preparare la zona allattamento"]
+  ]},
+  {id:"burocrazia", emoji:"📑", phase:"burocrazia", name:"Burocrazia & documenti", items:[
+    ["Dichiarazione di nascita (in ospedale o al Comune)"],
+    ["Congedo di paternità — domanda INPS"],
+    ["Assegno unico universale — INPS"],
+    ["Tessera sanitaria e scelta del pediatra per il bimbo"],
+    ["Codice fiscale del neonato"],
+    ["Aggiungere il bimbo allo stato di famiglia"],
+    ["Comunicare la nascita al datore di lavoro"],
+    ["Verificare bonus e agevolazioni a cui hai diritto"]
+  ]},
+  {id:"dubbi", emoji:"❓", phase:"dubbi", name:"Dubbi da chiarire", items:[
+    ["Domande per l'ostetrica al prossimo controllo"],
+    ["Cosa fornisce l'ospedale (pannolini? body?)"],
+    ["Dubbi sull'allattamento da chiarire"]
   ]}
 ];
 
-const PHASES = [
-  {id:"all", label:"Tutto"},
-  {id:"preparto", label:"Preparto"},
-  {id:"ospedale", label:"Per l'ospedale"},
-  {id:"casa", label:"Neonato & casa"},
-  {id:"postparto", label:"Postparto"}
+/* macro di appartenenza: tutto ciò che è "fare" vs "comprare" */
+const FARE_IDS = new Set(["dafare","compiti_fede","compiti_sara","burocrazia","dubbi"]);
+DEFAULT.forEach(c=>{ c.macro = FARE_IDS.has(c.id) ? "fare" : "comprare"; });
+
+const MACROS = [
+  {id:"comprare", label:"🛒 Da comprare"},
+  {id:"fare", label:"✅ Da fare"}
 ];
+
+const PHASES_BY_MACRO = {
+  comprare:[
+    {id:"all", label:"Tutto"},
+    {id:"preparto", label:"Preparto"},
+    {id:"ospedale", label:"Per l'ospedale"},
+    {id:"casa", label:"Neonato & casa"},
+    {id:"postparto", label:"Postparto"}
+  ],
+  fare:[
+    {id:"all", label:"Tutto"},
+    {id:"generale", label:"Generale"},
+    {id:"fede", label:"Fede"},
+    {id:"sara", label:"Sara"},
+    {id:"burocrazia", label:"Burocrazia"},
+    {id:"dubbi", label:"Dubbi"}
+  ]
+};
 
 /* ---------------- Stato persistente ---------------- */
 const KEY="cicogna_v1";
@@ -317,6 +397,7 @@ state.checked=state.checked||{}; state.custom=state.custom||{};
 state.removed=state.removed||{}; state.openCats=state.openCats||{};
 state.counts=state.counts||{};
 
+let activeMacro="comprare";
 let activePhase="all";
 
 /* ---------------- Costruzione liste effettive ---------------- */
@@ -324,8 +405,11 @@ function catItems(cat){
   const base=cat.items
     .map(it=>({text:it[0],qty:it[1]||null,key:cat.id+"::"+it[0]}))
     .filter(it=>!state.removed[it.key]);
-  const custom=(state.custom[cat.id]||[])
-    .map(t=>({text:t,qty:null,key:cat.id+"::"+t,custom:true}));
+  const custom=(state.custom[cat.id]||[]).map(c=>{
+    const t = typeof c==="string" ? c : c.text;
+    const q = typeof c==="string" ? null : (c.qty||null);
+    return {text:t, qty:q, key:cat.id+"::"+t, custom:true};
+  });
   return base.concat(custom);
 }
 
@@ -344,10 +428,22 @@ function itemDone(it){
 /* ---------------- Rendering ---------------- */
 const listEl=document.getElementById("list");
 const phasesEl=document.getElementById("phases");
+const macroEl=document.getElementById("macro");
+
+function buildMacro(){
+  macroEl.innerHTML="";
+  MACROS.forEach(m=>{
+    const b=document.createElement("button");
+    b.className=(m.id===activeMacro?"active":"");
+    b.textContent=m.label;
+    b.onclick=()=>{activeMacro=m.id;activePhase="all";buildMacro();buildPhases();render();};
+    macroEl.appendChild(b);
+  });
+}
 
 function buildPhases(){
   phasesEl.innerHTML="";
-  PHASES.forEach(p=>{
+  (PHASES_BY_MACRO[activeMacro]||[]).forEach(p=>{
     const b=document.createElement("button");
     b.className="chip"+(p.id===activePhase?" active":"");
     b.textContent=p.label;
@@ -361,12 +457,12 @@ function render(){
   let totAll=0, doneAll=0;
 
   DEFAULT.forEach(cat=>{
+    if(cat.macro!==activeMacro) return;            // solo la macro attiva
     const items=catItems(cat);
     const done=items.filter(itemDone).length;
     totAll+=items.length; doneAll+=done;
 
     if(activePhase!=="all" && cat.phase!==activePhase) return;
-    if(items.length===0 && !(state.custom[cat.id]||[]).length) {/* still show to allow adding */}
 
     const open = state.openCats[cat.id] ?? (done<items.length && items.length>0);
     const pct = items.length? Math.round(done/items.length*100):0;
@@ -447,7 +543,7 @@ function render(){
       li.querySelector(".del").onclick=(e)=>{
         e.stopPropagation();
         if(it.custom){
-          state.custom[cat.id]=(state.custom[cat.id]||[]).filter(t=>t!==it.text);
+          state.custom[cat.id]=(state.custom[cat.id]||[]).filter(c=>(typeof c==="string"?c:c.text)!==it.text);
         } else {
           state.removed[it.key]=true;
         }
@@ -462,35 +558,64 @@ function render(){
     // add row
     const add=document.createElement("div");
     add.className="add";
-    add.innerHTML=`<input type="text" placeholder="Aggiungi a ${cat.name.toLowerCase()}…" />
-      <button title="Aggiungi">+</button>`;
-    const inp=add.querySelector("input");
+    add.innerHTML=`<input class="add-text" type="text" placeholder="Aggiungi articolo…" />
+      <input class="add-qty" type="text" placeholder="q.tà" />
+      <button class="add-btn" title="Aggiungi">+</button>`;
+    const inp=add.querySelector(".add-text");
+    const inpQ=add.querySelector(".add-qty");
     const addFn=()=>{
       const v=inp.value.trim(); if(!v) return;
+      const q=inpQ.value.trim();
       state.custom[cat.id]=state.custom[cat.id]||[];
-      if(!state.custom[cat.id].includes(v)) state.custom[cat.id].push(v);
-      inp.value=""; save(state); render();
+      const exists=state.custom[cat.id].some(c=>(typeof c==="string"?c:c.text)===v);
+      if(!exists) state.custom[cat.id].push({text:v, qty:q||null});
+      inp.value=""; inpQ.value=""; save(state); render();
     };
-    add.querySelector("button").onclick=addFn;
-    inp.addEventListener("keydown",e=>{if(e.key==="Enter")addFn();});
+    add.querySelector(".add-btn").onclick=addFn;
+    inp.addEventListener("keydown",e=>{if(e.key==="Enter")inpQ.focus();});
+    inpQ.addEventListener("keydown",e=>{if(e.key==="Enter")addFn();});
     wrap.appendChild(add);
+
+    // ripristino articoli standard eliminati in questa categoria
+    const removedHere=cat.items.filter(it=>state.removed[cat.id+"::"+it[0]]);
+    if(removedHere.length){
+      const r=document.createElement("button");
+      r.className="restore";
+      r.innerHTML=`↺ Ripristina ${removedHere.length} eliminat${removedHere.length===1?"o":"i"}`;
+      r.onclick=(e)=>{
+        e.stopPropagation();
+        removedHere.forEach(it=>{delete state.removed[cat.id+"::"+it[0]];});
+        save(state); render(); toast("Articoli ripristinati");
+      };
+      wrap.appendChild(r);
+    }
 
     card.appendChild(wrap);
     listEl.appendChild(card);
   });
 
-  // overall ring
+  // overall ring (relativo alla macro attiva)
   const pctAll=totAll?Math.round(doneAll/totAll*100):0;
   const circ=169.6;
   document.getElementById("ringFill").style.strokeDashoffset=circ-(circ*pctAll/100);
   document.getElementById("ringPct").textContent=pctAll+"%";
-  document.getElementById("metaSub").textContent=`${doneAll} articoli su ${totAll} pronti`;
+  const noun = activeMacro==="comprare" ? "articoli" : "cose";
+  const verb = activeMacro==="comprare" ? "pronti" : "fatte";
+  document.getElementById("metaSub").textContent=`${doneAll} ${noun} su ${totAll} ${verb}`;
   const t=document.getElementById("metaTitle");
-  t.textContent = pctAll===0?"Iniziamo a preparare il nido"
-    : pctAll<40?"Si parte, un passo alla volta"
-    : pctAll<80?"Il nido prende forma 🪺"
-    : pctAll<100?"Ci siamo quasi!"
-    : "Tutto pronto per il bebè 💛";
+  if(activeMacro==="comprare"){
+    t.textContent = pctAll===0?"Iniziamo a preparare il nido"
+      : pctAll<40?"Si parte, un passo alla volta"
+      : pctAll<80?"Il nido prende forma 🪺"
+      : pctAll<100?"Ci siamo quasi!"
+      : "Tutto pronto per il bebè 💛";
+  } else {
+    t.textContent = pctAll===0?"Organizziamo le cose da fare"
+      : pctAll<40?"Primi preparativi avviati"
+      : pctAll<80?"Buon ritmo, si procede"
+      : pctAll<100?"Quasi tutto sistemato!"
+      : "Tutto fatto, che squadra 🎉";
+  }
 }
 
 /* ---------------- Azioni footer ---------------- */
@@ -520,6 +645,7 @@ function trashSvg(){return '<svg width="18" height="18" viewBox="0 0 24 24" fill
   pos.forEach(([x,y],i)=>{const e=document.createElement("span");e.style.left=x+"%";e.style.top=y+"%";
     e.style.animationDelay=(i*0.5)+"s";s.appendChild(e);});})();
 
+buildMacro();
 buildPhases();
 render();
 
