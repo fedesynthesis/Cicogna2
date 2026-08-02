@@ -1,6 +1,6 @@
 /* Cicogna — service worker
    Cache-first per la app shell, network-first con fallback per il resto. */
-const CACHE = "cicogna-v6";
+const CACHE = "cicogna-v7";
 const ASSETS = [
   "./",
   "./index.html",
@@ -27,6 +27,12 @@ self.addEventListener("activate", (e) => {
 self.addEventListener("fetch", (e) => {
   const req = e.request;
   if (req.method !== "GET") return;
+
+  // NON intercettare Firebase/Firestore: sempre rete diretta, mai cache
+  // (altrimenti la cache-first romperebbe la sincronizzazione in tempo reale).
+  if (/firestore\.googleapis\.com|firebaseinstallations\.googleapis\.com|firebase\.googleapis\.com|firebaseremoteconfig\.googleapis\.com|gstatic\.com\/firebasejs/.test(req.url)) {
+    return;
+  }
 
   // Navigazioni: rete, fallback alla index in cache (offline)
   if (req.mode === "navigate") {

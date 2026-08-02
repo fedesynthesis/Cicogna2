@@ -182,6 +182,15 @@
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
   .note{text-align:center;color:var(--ink-soft);font-size:12.5px;margin:18px 0 6px;line-height:1.5}
+
+  /* ---------- Indicatore sincronizzazione ---------- */
+  .sync{display:inline-flex;align-items:center;gap:7px;margin:10px auto 0;font-size:12px;
+    color:var(--ink-soft);background:var(--surface);border:1px solid var(--line);
+    padding:5px 13px;border-radius:999px;box-shadow:var(--shadow-soft)}
+  .sync .d{width:8px;height:8px;border-radius:50%;background:#cbd5cf;transition:background .3s;flex:0 0 auto}
+  .sync .d.on{background:var(--sage);box-shadow:0 0 0 3px rgba(79,162,105,.16)}
+  .sync .d.wait{background:var(--butter)}
+  .sync .d.off{background:var(--coral)}
 </style>
 </head>
 <body>
@@ -219,6 +228,7 @@
     </div>
     <h1>Cicogna</h1>
     <p class="subtitle">La lista per l'arrivo del bebè</p>
+    <div class="sync"><span class="d wait" id="syncDot"></span><span id="syncTxt">Avvio sincronizzazione…</span></div>
   </header>
 
   <div class="wrap">
@@ -401,6 +411,7 @@ function load(){
 function save(s){
   try{localStorage.setItem(KEY,JSON.stringify(s));}
   catch(e){mem=s;}
+  scheduleCloudPush();   // sincronizza sull'altro telefono (se Firebase è attivo)
 }
 let state = load() || {checked:{},custom:{},removed:{},openCats:{},hideDone:false};
 state.checked=state.checked||{}; state.custom=state.custom||{};
@@ -779,6 +790,122 @@ function trashSvg(){return '<svg width="18" height="18" viewBox="0 0 24 24" fill
 buildMacro();
 buildPhases();
 render();
+
+/* ================= Sincronizzazione Firebase (due telefoni) =================
+   Una sola lista condivisa in un percorso segreto (niente login).
+   Si sincronizzano SOLO i dati veri (spunte, contatori, articoli, liste famiglia).
+   openCats/hideDone restano locali al telefono (preferenze di visualizzazione).
+   L'app funziona comunque offline dal localStorage: Firebase è un "extra". */
+const FB_CONFIG = {
+  apiKey:            "AIzaSyDLbGyLrPaw3tQXY3HOaTxWJLnOWPUjvXU",
+  authDomain:        "cicogna-57ae0.firebaseapp.com",
+  projectId:         "cicogna-57ae0",
+  storageBucket:     "cicogna-57ae0.firebasestorage.app",
+  messagingSenderId: "1013139034396",
+  appId:             "1:1013139034396:web:4770893e05130ca600aad9"
+};
+// Percorso segreto della lista condivisa (due segmenti lunghi = sicurezza per oscurità).
+const ROOM_COL = "LL09Rb8OO0yjHQnJBsPCPSu1";
+const ROOM_DOC = "YXZm9MNsAFCNNQiTgQnU7LEg";
+const SYNC_KEYS = ["checked","counts","custom","removed","familyLists"];
+const SYNC_INIT = "cicogna_sync_init";
+
+let FB=null, fdoc=null, fbReady=false, pendingWrite=false, dirty=false, pushTimer=null;
+
+function setConn(kind,label){
+  const d=document.getElementById("syncDot"), t=document.getElementById("syncTxt");
+  if(d) d.className="d "+kind;
+  if(t && label) t.textContent=label;
+}
+function emptyFor(k){ return k==="familyLists" ? [] : {}; }
+function syncedSubset(s){ const o={}; SYNC_KEYS.forEach(k=> o[k]= s[k]!=null ? s[k] : emptyFor(k)); return o; }
+
+function scheduleCloudPush(){
+  if(!fbReady) return;
+  dirty=true;
+  clearTimeout(pushTimer);
+  pushTimer=setTimeout(cloudPush, 600);   // accorpa più tocchi in un'unica scrittura
+}
+async function cloudPush(){
+  if(!fbReady) return;
+  pendingWrite=true;
+  try{ await FB.setDoc(fdoc, syncedSubset(state)); dirty=false; }
+  catch(e){ console.warn("Sync: scrittura fallita", e); }
+  finally{ pendingWrite=false; }
+}
+
+/* Fusione senza perdite: usata SOLO la prima volta che questo telefono si sincronizza,
+   per non perdere i dati già presenti né in locale né sul server. */
+function mergeUnion(local, server){
+  const out={};
+  out.checked=Object.assign({}, server.checked||{});
+  Object.entries(local.checked||{}).forEach(([k,v])=>{ if(v) out.checked[k]=true; else if(!(k in out.checked)) out.checked[k]=v; });
+  out.counts=Object.assign({}, server.counts||{});
+  Object.entries(local.counts||{}).forEach(([k,v])=>{ out.counts[k]=Math.max(out.counts[k]||0, v||0); });
+  out.removed=Object.assign({}, server.removed||{});
+  Object.entries(local.removed||{}).forEach(([k,v])=>{ if(v) out.removed[k]=true; });
+  out.custom={};
+  new Set([...Object.keys(server.custom||{}), ...Object.keys(local.custom||{})]).forEach(cat=>{
+    const seen=new Set(), arr=[];
+    [ ...((server.custom||{})[cat]||[]), ...((local.custom||{})[cat]||[]) ].forEach(c=>{
+      const t=typeof c==="string"?c:(c&&c.text);
+      if(t==null || seen.has(t)) return; seen.add(t);
+      arr.push(typeof c==="string"?{text:c,qty:null}:c);
+    });
+    out.custom[cat]=arr;
+  });
+  const byId={};
+  (server.familyLists||[]).forEach(l=> byId[l.id]={id:l.id, name:l.name, items:[...(l.items||[])]});
+  (local.familyLists||[]).forEach(l=>{
+    if(!byId[l.id]){ byId[l.id]={id:l.id, name:l.name, items:[...(l.items||[])]}; }
+    else{
+      const seen=new Set(byId[l.id].items.map(i=>i.id));
+      (l.items||[]).forEach(i=>{ if(!seen.has(i.id)){ byId[l.id].items.push(i); seen.add(i.id);} });
+    }
+  });
+  out.familyLists=Object.values(byId);
+  return out;
+}
+function adoptServer(data){ SYNC_KEYS.forEach(k=>{ if(data[k]!=null) state[k]=data[k]; }); }
+function persistLocal(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){ mem=state; } }
+
+async function initSync(){
+  try{
+    setConn("wait","Connessione…");
+    const appMod = await import("https://www.gstatic.com/firebasejs/12.17.0/firebase-app.js");
+    FB           = await import("https://www.gstatic.com/firebasejs/12.17.0/firebase-firestore.js");
+    const app = appMod.initializeApp(FB_CONFIG);
+    fdoc = FB.doc(FB.getFirestore(app), ROOM_COL, ROOM_DOC);
+    fbReady = true;
+
+    FB.onSnapshot(fdoc, { includeMetadataChanges:true },
+      (snap)=>{
+        if(snap.metadata.fromCache){ setConn("wait","Offline · solo questo telefono"); return; }
+        setConn("on","Sincronizzato ✓");
+        if(pendingWrite || dirty) return;        // ho modifiche mie in corso: non le sovrascrivo
+        const data = snap.exists() ? snap.data() : null;
+        const first = !localStorage.getItem(SYNC_INIT);
+        if(!data){
+          cloudPush();                           // server vuoto → semino con i dati di questo telefono
+        } else if(first){
+          const merged = mergeUnion(state, data);// prima volta → fondo locale + server senza perdite
+          SYNC_KEYS.forEach(k=> state[k]=merged[k]);
+          persistLocal(); cloudPush();
+        } else {
+          adoptServer(data);                     // poi il server è la verità condivisa
+          persistLocal();
+        }
+        localStorage.setItem(SYNC_INIT,"1");
+        buildMacro(); buildPhases(); render();
+      },
+      (err)=>{ setConn("off","Sync non disponibile"); console.error("Sync:", err); }
+    );
+  }catch(e){
+    setConn("off","Sync non disponibile");
+    console.warn("Sync non attivo (l'app resta usabile in locale):", e);
+  }
+}
+initSync();
 
 /* ---------------- PWA: service worker ---------------- */
 if ("serviceWorker" in navigator) {
