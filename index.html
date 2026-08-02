@@ -105,6 +105,14 @@
   .chip.active{background:var(--periwinkle);color:#fff;border-color:var(--periwinkle);
     box-shadow:var(--shadow-soft)}
 
+  .dellist{flex:0 0 auto;border:none;background:none;color:#cdd8d0;cursor:pointer;padding:6px;
+    display:grid;place-items:center;border-radius:8px;transition:color .15s,transform .12s}
+  .dellist:hover{color:var(--coral)}
+  .dellist:active{color:var(--coral);transform:scale(.85)}
+  .fam-empty{text-align:center;color:var(--ink-soft);font-size:14px;padding:22px 10px}
+  .newlist{border:1px dashed var(--periwinkle-soft);background:#f3fbf5}
+  .newlist .nl-name{flex:1;min-width:0}
+
   /* ---------- Category card ---------- */
   .cat{background:var(--surface);border-radius:22px;margin:14px 0;box-shadow:var(--shadow-soft);
     border:1px solid var(--line);overflow:hidden}
@@ -359,8 +367,9 @@ const FARE_IDS = new Set(["dafare","compiti_fede","compiti_sara","burocrazia","d
 DEFAULT.forEach(c=>{ c.macro = FARE_IDS.has(c.id) ? "fare" : "comprare"; });
 
 const MACROS = [
-  {id:"comprare", label:"🛒 Da comprare"},
-  {id:"fare", label:"✅ Da fare"}
+  {id:"comprare", label:"🛒 Comprare"},
+  {id:"fare", label:"✅ Da fare"},
+  {id:"famiglia", label:"👪 Famiglia"}
 ];
 
 const PHASES_BY_MACRO = {
@@ -378,7 +387,8 @@ const PHASES_BY_MACRO = {
     {id:"sara", label:"Sara"},
     {id:"burocrazia", label:"Burocrazia"},
     {id:"dubbi", label:"Dubbi"}
-  ]
+  ],
+  famiglia:[]
 };
 
 /* ---------------- Stato persistente ---------------- */
@@ -396,6 +406,7 @@ let state = load() || {checked:{},custom:{},removed:{},openCats:{},hideDone:fals
 state.checked=state.checked||{}; state.custom=state.custom||{};
 state.removed=state.removed||{}; state.openCats=state.openCats||{};
 state.counts=state.counts||{};
+state.familyLists=state.familyLists||[];   // nuova sezione: liste per famigliari
 
 let activeMacro="comprare";
 let activePhase="all";
@@ -454,6 +465,7 @@ function buildPhases(){
 
 function render(){
   listEl.innerHTML="";
+  if(activeMacro==="famiglia"){ renderFamily(); return; }
   let totAll=0, doneAll=0;
 
   DEFAULT.forEach(cat=>{
@@ -631,6 +643,125 @@ document.getElementById("hideDoneBtn").onclick=function(){
   this.classList.toggle("primary",state.hideDone);
   save(state); render();
 };
+
+/* ---------------- Sezione Famiglia (liste personalizzate) ---------------- */
+function uid(){ return "l"+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+
+function renderFamily(){
+  let totAll=0, doneAll=0;
+  state.familyLists.forEach(l=>{ totAll+=l.items.length; doneAll+=l.items.filter(i=>i.done).length; });
+
+  // card "nuova lista"
+  const nl=document.createElement("div");
+  nl.className="cat newlist";
+  nl.innerHTML=`
+    <div class="add" style="border-top:none">
+      <input class="nl-name" type="text" placeholder="Nome lista (es. Mamma, Nonna, Regali)…" />
+      <button class="add-btn" title="Crea lista">+</button>
+    </div>`;
+  const nlInp=nl.querySelector(".nl-name");
+  const createFn=()=>{
+    const v=nlInp.value.trim(); if(!v) return;
+    state.familyLists.push({id:uid(), name:v, items:[]});
+    nlInp.value=""; save(state); render();
+  };
+  nl.querySelector(".add-btn").onclick=createFn;
+  nlInp.addEventListener("keydown",e=>{if(e.key==="Enter")createFn();});
+  listEl.appendChild(nl);
+
+  if(state.familyLists.length===0){
+    const e=document.createElement("div");
+    e.className="fam-empty";
+    e.textContent="Nessuna lista. Crea la prima qui sopra 👆";
+    listEl.appendChild(e);
+  }
+
+  // liste esistenti
+  state.familyLists.forEach(l=>{
+    const done=l.items.filter(i=>i.done).length;
+    const open = state.openCats[l.id] ?? true;
+    const pct = l.items.length? Math.round(done/l.items.length*100):0;
+
+    const card=document.createElement("section");
+    card.className="cat"+(open?" open":"");
+
+    const head=document.createElement("div");
+    head.className="cat-head";
+    head.innerHTML=`
+      <div class="cat-emoji">🧺</div>
+      <div class="cat-title">
+        <h2>${escapeHtml(l.name)}</h2>
+        <div class="cat-bar"><i style="width:${pct}%"></i></div>
+      </div>
+      <div class="cat-count">${done}/${l.items.length}</div>
+      <button class="dellist" title="Elimina lista">${trashSvg()}</button>
+      <div class="chev">${chevSvg()}</div>`;
+    head.querySelector(".chev").onclick=head.querySelector(".cat-emoji").onclick=()=>{
+      state.openCats[l.id]=!open; save(state); render();
+    };
+    head.querySelector(".cat-title").onclick=()=>{ state.openCats[l.id]=!open; save(state); render(); };
+    head.querySelector(".dellist").onclick=(e)=>{
+      e.stopPropagation();
+      state.familyLists=state.familyLists.filter(x=>x.id!==l.id);
+      save(state); render(); toast("Lista eliminata");
+    };
+    card.appendChild(head);
+
+    const wrap=document.createElement("div");
+    wrap.className="items";
+    const ul=document.createElement("ul");
+    let items=l.items;
+    if(state.hideDone) items=items.filter(i=>!i.done);
+    items.forEach(it=>{
+      const li=document.createElement("li");
+      if(it.done) li.className="done";
+      li.innerHTML=`
+        <div class="check${it.done?" on":""}">${checkSvg()}</div>
+        <span class="label">${escapeHtml(it.text)}</span>
+        <button class="del" title="Elimina">${trashSvg()}</button>`;
+      const toggle=()=>{ it.done=!it.done; save(state); render(); };
+      li.querySelector(".check").onclick=toggle;
+      li.querySelector(".label").onclick=toggle;
+      li.querySelector(".del").onclick=(e)=>{
+        e.stopPropagation();
+        l.items=l.items.filter(x=>x.id!==it.id);
+        save(state); render();
+      };
+      ul.appendChild(li);
+    });
+    wrap.appendChild(ul);
+
+    // aggiunta oggetto
+    const add=document.createElement("div");
+    add.className="add";
+    add.innerHTML=`<input class="add-text" type="text" placeholder="Aggiungi oggetto…" />
+      <button class="add-btn" title="Aggiungi">+</button>`;
+    const inp=add.querySelector(".add-text");
+    const addFn=()=>{
+      const v=inp.value.trim(); if(!v) return;
+      l.items.push({id:uid(), text:v, done:false});
+      inp.value=""; save(state); render();
+    };
+    add.querySelector(".add-btn").onclick=addFn;
+    inp.addEventListener("keydown",e=>{if(e.key==="Enter")addFn();});
+    wrap.appendChild(add);
+
+    card.appendChild(wrap);
+    listEl.appendChild(card);
+  });
+
+  // anello di progresso
+  const pctAll=totAll?Math.round(doneAll/totAll*100):0;
+  const circ=169.6;
+  document.getElementById("ringFill").style.strokeDashoffset=circ-(circ*pctAll/100);
+  document.getElementById("ringPct").textContent=pctAll+"%";
+  document.getElementById("metaSub").textContent=`${doneAll} oggetti su ${totAll} presi`;
+  document.getElementById("metaTitle").textContent =
+    state.familyLists.length===0 ? "Crea una lista per la famiglia"
+    : pctAll===0 ? "Liste della famiglia pronte"
+    : pctAll<100 ? "Spesa famiglia in corso 🧺"
+    : "Tutto preso! 🎉";
+}
 
 /* ---------------- Util ---------------- */
 function toast(msg){const t=document.getElementById("toast");t.textContent=msg;
