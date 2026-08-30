@@ -1,6 +1,6 @@
 /* Cicogna — service worker
    Cache-first per la app shell, network-first con fallback per il resto. */
-const CACHE = 'cicogna-v11';
+const CACHE = 'cicogna-v12';
 const ASSETS = [
   "./",
   "./index.html",
@@ -37,8 +37,12 @@ self.addEventListener("fetch", (e) => {
 
   // Navigazioni: rete, fallback alla index in cache (offline)
   if (req.mode === "navigate") {
+    // no-store: salta la cache HTTP di GitHub (max-age 600), altrimenti per 10 minuti
+    // l'app continuerebbe ad aprirsi nella versione vecchia
     e.respondWith(
-      fetch(req).catch(() => caches.match("./index.html"))
+      fetch(new Request(req.url, {cache:"no-store", credentials:"same-origin"}))
+        .catch(() => fetch(req))
+        .catch(() => caches.match("./index.html"))
     );
     return;
   }
