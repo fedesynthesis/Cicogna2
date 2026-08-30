@@ -1,6 +1,6 @@
 /* Cicogna — service worker
    Cache-first per la app shell, network-first con fallback per il resto. */
-const CACHE = 'cicogna-v9';
+const CACHE = 'cicogna-v10';
 const ASSETS = [
   "./",
   "./index.html",
@@ -25,6 +25,7 @@ self.addEventListener("activate", (e) => {
 });
 
 self.addEventListener("fetch", (e) => {
+  try{ if(new URL(e.request.url).pathname.startsWith("/hub/")) return; }catch(_){}   // barra Hub: sempre dalla rete
   const req = e.request;
   if (req.method !== "GET") return;
 
