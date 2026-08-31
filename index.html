@@ -123,6 +123,9 @@
   .ev .txt span{display:block;font-size:12.5px;color:var(--ink-soft)}
   .ev .time{font-family:'Quicksand';font-weight:600;font-size:14px;color:var(--ink-soft);flex:none}
   .ev .del{border:none;background:none;font-size:16px;padding:4px;cursor:pointer;opacity:.5}
+  .tocca{cursor:pointer}
+  .ev.tocca:active{background:rgba(0,0,0,.03)}
+  .row .t.tocca:active{opacity:.6}
   .daylabel{font-family:'Quicksand';font-weight:700;font-size:13px;color:var(--ink-soft);
     text-transform:uppercase;letter-spacing:.6px;margin:22px 2px 8px}
 
@@ -289,9 +292,18 @@ function nowParts(){
   return { date: d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"),
            time: String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0") };
 }
-function openEvent(type){
+function openEvent(type, id){
   const n=nowParts();
-  draft={ type:type, kind:"pipi", mode:"seno", side:"sx", date:n.date, time:n.time };
+  const e = id ? state.events.find(x=>x.id===id) : null;
+  if(e){
+    const d=new Date(e.at);
+    draft={ id:e.id, type:e.type, kind:e.kind||"pipi", mode:e.mode||"seno", side:e.side||"sx",
+            amount:e.amount||null, min:e.min||"", ml:e.ml||"", note:e.note||"",
+            date: d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"),
+            time: String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0") };
+  } else {
+    draft={ type:type, kind:"pipi", mode:"seno", side:"sx", date:n.date, time:n.time };
+  }
   renderSheetEvent();
   document.getElementById("scrim").classList.add("on");
 }
@@ -299,7 +311,7 @@ function closeSheet(){ document.getElementById("scrim").classList.remove("on"); 
 
 function renderSheetEvent(){
   const f=draft, s=document.getElementById("sheet");
-  const titolo = f.type==="diaper" ? "Cambio" : f.type==="feed" ? "Poppata" : "Vomito";
+  const titolo = (f.id?"Modifica ":"") + (f.type==="diaper" ? "cambio" : f.type==="feed" ? "poppata" : "vomito");
   const hint   = f.type==="diaper" ? "Cosa ha fatto" : f.type==="feed" ? "Come ha mangiato" : "Quando è successo";
 
   let campi="";
@@ -318,10 +330,10 @@ function renderSheetEvent(){
             + '<button data-s="sx" class="'+(f.side==="sx"?"on":"")+'">Sinistro</button>'
             + '<button data-s="dx" class="'+(f.side==="dx"?"on":"")+'">Destro</button>'
             + '<button data-s="due" class="'+(f.side==="due"?"on":"")+'">Entrambi</button></div>'
-            + '<div class="lbl">Durata</div><div class="fld"><input id="fmin" type="number" inputmode="numeric" placeholder="minuti"><span class="u">min</span></div>'
+            + '<div class="lbl">Durata</div><div class="fld"><input id="fmin" type="number" inputmode="numeric" placeholder="minuti" value="'+(f.min||"")+'"><span class="u">min</span></div>'
           : f.mode==="biberon"
-          ? '<div class="lbl">Quantità</div><div class="fld"><input id="fml" type="number" inputmode="numeric" placeholder="quanti ml"><span class="u">ml</span></div>'
-          : '<div class="lbl">Cosa</div><div class="fld"><input id="fcosa" type="text" placeholder="es. pappa di verdure"></div>');
+          ? '<div class="lbl">Quantità</div><div class="fld"><input id="fml" type="number" inputmode="numeric" placeholder="quanti ml" value="'+(f.ml||"")+'"><span class="u">ml</span></div>'
+          : '<div class="lbl">Cosa</div><div class="fld"><input id="fcosa" type="text" placeholder="es. pappa di verdure" value="'+esc(f.note||"")+'"></div>');
   } else {
     campi = '<div class="lbl">Quanto</div><div class="opts" id="vamt">'
       + '<button data-v="poco" class="'+(f.amount==="poco"?"on":"")+'">Poco</button>'
@@ -334,8 +346,8 @@ function renderSheetEvent(){
     + '<div class="lbl">Giorno e ora</div>'
     + '<div class="opts"><div class="fld" style="flex:1.4"><input id="edate" type="date" value="'+f.date+'"></div>'
     + '<div class="fld" style="flex:1"><input id="etime" type="time" value="'+f.time+'"></div></div>'
-    + '<div class="lbl">Nota</div><div class="fld"><input id="enote" type="text" placeholder="facoltativa"></div>'
-    + '<button class="go" id="ego">Registra</button>'
+    + '<div class="lbl">Nota</div><div class="fld"><input id="enote" type="text" placeholder="facoltativa" value="'+esc(f.type==="feed"?"":(f.note||""))+'"></div>'
+    + '<button class="go" id="ego">'+(f.id?"Salva modifiche":"Registra")+'</button>'
     + '<button class="cancel" id="ecancel">Annulla</button>';
 
   const keep=()=>{ const d=s.querySelector("#edate"), t=s.querySelector("#etime"); if(d) draft.date=d.value; if(t) draft.time=t.value; };
@@ -358,10 +370,12 @@ function renderSheetEvent(){
       ev.ml=ml?(parseInt(ml.value,10)||null):null;
       if(cosa && cosa.value.trim()) ev.note=cosa.value.trim();
     } else { ev.amount=draft.amount||null; }
-    state.events.unshift(ev);
+    const modifica = !!draft.id;
+    if(modifica){ ev.id=draft.id; state.events=state.events.map(x=> x.id===draft.id ? ev : x); }
+    else state.events.unshift(ev);
     state.events.sort((a,b)=>b.at-a.at);
     save(); closeSheet(); render();
-    toast(draft && draft.type==="diaper" ? "Cambio registrato" : draft && draft.type==="feed" ? "Poppata registrata" : "Registrato");
+    toast(modifica ? "Modifica salvata" : (ev.type==="diaper" ? "Cambio registrato" : ev.type==="feed" ? "Poppata registrata" : "Registrato"));
   };
   s.querySelector("#ecancel").onclick=closeSheet;
 }
@@ -423,7 +437,7 @@ function renderBebe(){
       x.righe.slice(0,40).forEach((it,i)=>{
         const prev=x.righe[i+1];
         const diff=prev ? (it.kg>=prev.kg?"+":"−")+Math.abs(Math.round((it.kg-prev.kg)*1000))+" g" : "prima pesata";
-        h += '<div class="ev"><div class="dot">⚖️</div>'
+        h += '<div class="ev tocca" data-wedit="'+it.id+'"><div class="dot">⚖️</div>'
           + '<div class="txt"><b>'+fmtKg(it.kg)+' kg</b><span>'+fmtDate(it.at)+(it.note?" · "+esc(it.note):"")+'</span></div>'
           + '<div class="time">'+diff+'</div>'
           + '<button class="del" data-wdel="'+it.id+'">🗑</button></div>';
@@ -434,7 +448,7 @@ function renderBebe(){
         if(e.type==="feed")       tit=(e.mode==="seno"?"🤱 ":e.mode==="biberon"?"🍼 ":"🥄 ")+feedText(e);
         else if(e.type==="vomit") tit="Vomito"+(e.amount?" · "+e.amount:"");
         else                      tit=(KINDS[e.kind]||KINDS.pipi).e+" "+(KINDS[e.kind]||KINDS.pipi).t;
-        h += '<div class="ev"><div class="dot">'+dayShort(e.at)+'</div>'
+        h += '<div class="ev tocca" data-edit="'+e.id+'"><div class="dot">'+dayShort(e.at)+'</div>'
           + '<div class="txt"><b>'+tit+'</b>'+(e.note?'<span>'+esc(e.note)+'</span>':'')+'</div>'
           + '<div class="time">'+hhmm(e.at)+'</div>'
           + '<button class="del" data-del="'+e.id+'">🗑</button></div>';
@@ -453,7 +467,9 @@ function renderBebe(){
     e.stopPropagation();
     if(b.dataset.new==="weight") openWeight(); else openEvent(b.dataset.new);
   });
-  v.querySelectorAll("[data-del]").forEach(b=> b.onclick=()=>{ if(confirm("Eliminare questa voce?")) delEvent(b.dataset.del); });
+  v.querySelectorAll("[data-del]").forEach(b=> b.onclick=(e)=>{ e.stopPropagation(); if(confirm("Eliminare questa voce?")) delEvent(b.dataset.del); });
+  v.querySelectorAll("[data-edit]").forEach(el=> tapSubito(el, ()=>{ const ev=state.events.find(x=>x.id===el.dataset.edit); if(ev) openEvent(ev.type, ev.id); }));
+  v.querySelectorAll("[data-wedit]").forEach(el=> tapSubito(el, ()=> openWeight(el.dataset.wedit)));
   v.querySelectorAll("[data-wdel]").forEach(b=> b.onclick=()=>{
     if(confirm("Eliminare questa pesata?")){ state.weights=state.weights.filter(z=>z.id!==b.dataset.wdel); save(); render(); }
   });
@@ -462,15 +478,17 @@ function renderBebe(){
 /* ---- Peso ---- */
 function fmtKg(kg){ return (Math.round(kg*1000)/1000).toString().replace(".",","); }
 function fmtDate(ms){ return new Intl.DateTimeFormat("it-IT",{day:"numeric",month:"long",year:"numeric"}).format(new Date(ms)); }
-function openWeight(){
+function openWeight(id){
   const s=document.getElementById("sheet");
-  const oggi=new Date(); const iso=oggi.getFullYear()+"-"+String(oggi.getMonth()+1).padStart(2,"0")+"-"+String(oggi.getDate()).padStart(2,"0");
+  const w0 = id ? state.weights.find(x=>x.id===id) : null;
+  const base = w0 ? new Date(w0.at) : new Date();
+  const iso=base.getFullYear()+"-"+String(base.getMonth()+1).padStart(2,"0")+"-"+String(base.getDate()).padStart(2,"0");
   s.innerHTML =
-    '<h3>Pesata</h3><div class="hint">Peso e giorno della misurazione</div>'
-    + '<div class="lbl">Peso</div><div class="fld"><input id="wkg" type="number" inputmode="decimal" step="0.01" placeholder="es. 3,45"><span class="u">kg</span></div>'
+    '<h3>'+(w0?"Modifica pesata":"Pesata")+'</h3><div class="hint">Peso e giorno della misurazione</div>'
+    + '<div class="lbl">Peso</div><div class="fld"><input id="wkg" type="number" inputmode="decimal" step="0.01" placeholder="es. 3,45" value="'+(w0?w0.kg:"")+'"><span class="u">kg</span></div>'
     + '<div class="lbl">Giorno</div><div class="fld"><input id="wdate" type="date" value="'+iso+'"></div>'
-    + '<div class="lbl">Nota</div><div class="fld"><input id="wnote" type="text" placeholder="es. visita dal pediatra"></div>'
-    + '<button class="go" id="wgo">Registra pesata</button>'
+    + '<div class="lbl">Nota</div><div class="fld"><input id="wnote" type="text" placeholder="es. visita dal pediatra" value="'+esc(w0?(w0.note||""):"")+'"></div>'
+    + '<button class="go" id="wgo">'+(w0?"Salva modifiche":"Registra pesata")+'</button>'
     + '<button class="cancel" id="wcancel">Annulla</button>';
   document.getElementById("scrim").classList.add("on");
   s.querySelector("#wgo").onclick=()=>{
@@ -478,9 +496,11 @@ function openWeight(){
     if(!kg || kg<=0){ toast("Scrivi il peso"); return; }
     const d=s.querySelector("#wdate").value;
     const at=d ? new Date(d+"T12:00").getTime() : Date.now();
-    state.weights.unshift({id:uid(), kg:kg, at:at, note:s.querySelector("#wnote").value.trim()});
+    const nota=s.querySelector("#wnote").value.trim();
+    if(w0){ state.weights=state.weights.map(x=> x.id===w0.id ? {id:w0.id, kg:kg, at:at, note:nota} : x); }
+    else state.weights.unshift({id:uid(), kg:kg, at:at, note:nota});
     state.weights.sort((a,b)=>b.at-a.at);
-    save(); document.getElementById("scrim").classList.remove("on"); render(); toast("Pesata registrata");
+    save(); document.getElementById("scrim").classList.remove("on"); render(); toast(w0?"Modifica salvata":"Pesata registrata");
   };
   s.querySelector("#wcancel").onclick=()=>document.getElementById("scrim").classList.remove("on");
 }
@@ -509,12 +529,13 @@ function renderFare(){
 
   tapSubito(v.querySelector("#taddbtn"), ()=>openTask());
   v.querySelectorAll("[data-tg]").forEach(b=> b.onclick=()=>{ const t=state.tasks.find(x=>x.id===b.dataset.tg); if(t){ t.done=!t.done; save(); render(); } });
-  v.querySelectorAll("[data-tdel]").forEach(b=> b.onclick=()=>{ state.tasks=state.tasks.filter(x=>x.id!==b.dataset.tdel); save(); render(); });
+  v.querySelectorAll("[data-tdel]").forEach(b=> b.onclick=(e)=>{ e.stopPropagation(); state.tasks=state.tasks.filter(x=>x.id!==b.dataset.tdel); save(); render(); });
+  v.querySelectorAll("[data-tedit]").forEach(el=> tapSubito(el, ()=> openTask(el.dataset.tedit)));
 }
 function taskRow(t){
   return '<div class="row'+(t.done?" done":"")+'">'
     + '<button class="cb'+(t.done?" on":"")+'" data-tg="'+t.id+'">'+(t.done?"✓":"")+'</button>'
-    + '<div class="t">'+esc(t.text)+'</div>'
+    + '<div class="t tocca" data-tedit="'+t.id+'">'+esc(t.text)+'</div>'
     + '<span class="who '+t.who+'">'+WHO[t.who]+'</span>'
     + '<button class="del" data-tdel="'+t.id+'">🗑</button></div>';
 }
@@ -540,7 +561,7 @@ function renderListe(){
       l.items.forEach(i=>{
         h += '<div class="row'+(i.done?" done":"")+'">'
           + '<button class="cb'+(i.done?" on":"")+'" data-ig="'+l.id+"::"+i.id+'">'+(i.done?"✓":"")+'</button>'
-          + '<div class="t">'+esc(i.text)+'</div>'
+          + '<div class="t tocca" data-iedit="'+l.id+"::"+i.id+'">'+esc(i.text)+'</div>'
           + '<button class="del" data-idel="'+l.id+"::"+i.id+'">🗑</button></div>';
       });
 
@@ -565,6 +586,7 @@ function renderListe(){
     const [lid,iid]=b.dataset.ig.split("::"); const l=state.lists.find(x=>x.id===lid);
     const it=l&&l.items.find(x=>x.id===iid); if(it){ it.done=!it.done; save(); render(); }
   });
+  v.querySelectorAll("[data-iedit]").forEach(el=> tapSubito(el, ()=>{ const p=el.dataset.iedit.split("::"); openVoce(p[0],p[1]); }));
   v.querySelectorAll("[data-idel]").forEach(b=> b.onclick=()=>{
     const [lid,iid]=b.dataset.idel.split("::"); const l=state.lists.find(x=>x.id===lid);
     if(l){ l.items=l.items.filter(x=>x.id!==iid); save(); render(); }
@@ -589,15 +611,17 @@ function tapSubito(btn, fn){
 }
 
 /* ---- Schedine di inserimento (stesso meccanismo della sezione Bebè) ---- */
-function openTask(){
+function openTask(id){
   const s=document.getElementById("sheet");
+  const t0 = id ? state.tasks.find(x=>x.id===id) : null;
+  if(t0) taskWho=t0.who||"tutti";
   s.innerHTML =
-    '<h3>Nuovo compito</h3><div class="hint">Cosa c\'è da fare</div>'
-    + '<div class="lbl">Descrizione</div><div class="fld"><input id="tktxt" type="text" placeholder="es. chiamare il pediatra"></div>'
+    '<h3>'+(t0?"Modifica compito":"Nuovo compito")+'</h3><div class="hint">Cosa c\'è da fare</div>'
+    + '<div class="lbl">Descrizione</div><div class="fld"><input id="tktxt" type="text" placeholder="es. chiamare il pediatra" value="'+esc(t0?t0.text:"")+'"></div>'
     + '<div class="lbl">Di chi è</div><div class="opts" id="tkwho">'
       + Object.keys(WHO).map(k=>'<button data-w="'+k+'" class="'+(taskWho===k?"on":"")+'">'+WHO[k]+'</button>').join("")
     + '</div>'
-    + '<button class="go" id="tkgo">Aggiungi</button>'
+    + '<button class="go" id="tkgo">'+(t0?"Salva modifiche":"Aggiungi")+'</button>'
     + '<button class="cancel" id="tkcancel">Annulla</button>';
   document.getElementById("scrim").classList.add("on");
   s.querySelectorAll("#tkwho button").forEach(b=> b.onclick=()=>{
@@ -607,29 +631,32 @@ function openTask(){
   const go=()=>{
     const val=(s.querySelector("#tktxt").value||"").trim();
     if(!val){ toast("Scrivi cosa c\'è da fare"); return; }
-    state.tasks.unshift({id:uid(), text:val, who:taskWho, done:false, at:Date.now()});
-    save(); document.getElementById("scrim").classList.remove("on"); render(); toast("Aggiunto");
+    if(t0) state.tasks=state.tasks.map(x=> x.id===t0.id ? Object.assign({},x,{text:val, who:taskWho}) : x);
+    else state.tasks.unshift({id:uid(), text:val, who:taskWho, done:false, at:Date.now()});
+    save(); document.getElementById("scrim").classList.remove("on"); render(); toast(t0?"Modifica salvata":"Aggiunto");
   };
   tapSubito(s.querySelector("#tkgo"), go);
   s.querySelector("#tktxt").onkeydown=(e)=>{ if(e.key==="Enter") go(); };
   s.querySelector("#tkcancel").onclick=()=>document.getElementById("scrim").classList.remove("on");
   setTimeout(()=>{ const i=s.querySelector("#tktxt"); if(i) i.focus(); },250);
 }
-function openVoce(lid){
+function openVoce(lid, itemId){
   const l=state.lists.find(x=>x.id===lid); if(!l) return;
+  const it = itemId ? (l.items||[]).find(x=>x.id===itemId) : null;
   const s=document.getElementById("sheet");
   s.innerHTML =
-    '<h3>'+esc(l.name)+'</h3><div class="hint">Cosa aggiungo alla lista</div>'
-    + '<div class="lbl">Voce</div><div class="fld"><input id="vctxt" type="text" placeholder="es. crema cambio"></div>'
-    + '<button class="go" id="vcgo">Aggiungi</button>'
+    '<h3>'+esc(l.name)+'</h3><div class="hint">'+(it?"Modifica la voce":"Cosa aggiungo alla lista")+'</div>'
+    + '<div class="lbl">Voce</div><div class="fld"><input id="vctxt" type="text" placeholder="es. crema cambio" value="'+esc(it?it.text:"")+'"></div>'
+    + '<button class="go" id="vcgo">'+(it?"Salva modifiche":"Aggiungi")+'</button>'
     + '<button class="cancel" id="vccancel">Annulla</button>';
   document.getElementById("scrim").classList.add("on");
   const go=()=>{
     const val=(s.querySelector("#vctxt").value||"").trim();
     if(!val){ toast("Scrivi una voce"); return; }
-    l.items.push({id:uid(), text:val, done:false});
+    if(it) it.text=val;
+    else l.items.push({id:uid(), text:val, done:false});
     state.open[l.id]=true;
-    save(); document.getElementById("scrim").classList.remove("on"); render(); toast("Aggiunto");
+    save(); document.getElementById("scrim").classList.remove("on"); render(); toast(it?"Modifica salvata":"Aggiunto");
   };
   tapSubito(s.querySelector("#vcgo"), go);
   s.querySelector("#vctxt").onkeydown=(e)=>{ if(e.key==="Enter") go(); };
