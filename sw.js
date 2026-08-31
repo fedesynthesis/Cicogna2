@@ -1,61 +1,21 @@
-/* Cicogna — service worker
-   Cache-first per la app shell, network-first con fallback per il resto. */
-const CACHE = 'cicogna-v13';
-const ASSETS = [
-  "./",
-  "./index.html",
-  "./manifest.json",
-  "./icon-192.png",
-  "./icon-512.png",
-  "./icon-180.png"
-];
-
-self.addEventListener("install", (e) => {
-  e.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting())
-  );
-});
-
-self.addEventListener("activate", (e) => {
-  e.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
-    ).then(() => self.clients.claim())
-  );
-});
-
-self.addEventListener("fetch", (e) => {
-  try{ if(new URL(e.request.url).pathname.startsWith("/hub/")) return; }catch(_){}   // barra Hub: sempre dalla rete
-  const req = e.request;
-  if (req.method !== "GET") return;
-
-  // NON intercettare Firebase/Firestore: sempre rete diretta, mai cache
-  // (altrimenti la cache-first romperebbe la sincronizzazione in tempo reale).
-  if (/firestore\.googleapis\.com|firebaseinstallations\.googleapis\.com|firebase\.googleapis\.com|firebaseremoteconfig\.googleapis\.com|gstatic\.com\/firebasejs/.test(req.url)) {
-    return;
-  }
-
-  // Navigazioni: rete, fallback alla index in cache (offline)
-  if (req.mode === "navigate") {
-    // no-store: salta la cache HTTP di GitHub (max-age 600), altrimenti per 10 minuti
-    // l'app continuerebbe ad aprirsi nella versione vecchia
+/* Nido — service worker */
+const CACHE = 'nido-c2-v1';
+const ASSETS = ["./","./index.html","./manifest.json","./icon.svg","./icon-180.png","./icon-192.png","./icon-512.png"];
+self.addEventListener("install", e=>{ e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting())); });
+self.addEventListener("activate", e=>{ e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())); });
+self.addEventListener("fetch", e=>{
+  const req=e.request;
+  if(req.method!=="GET") return;
+  if(/firestore\.googleapis\.com|firebase|gstatic\.com\/firebasejs/.test(req.url)) return;   // sync sempre dalla rete
+  try{ if(new URL(req.url).pathname.startsWith("/hub/")) return; }catch(_){}
+  if(req.mode==="navigate"){
     e.respondWith(
-      fetch(new Request(req.url, {cache:"no-store", credentials:"same-origin"}))
-        .catch(() => fetch(req))
-        .catch(() => caches.match("./index.html"))
+      fetch(new Request(req.url,{cache:"no-store",credentials:"same-origin"}))
+        .catch(()=>fetch(req)).catch(()=>caches.match("./index.html"))
     );
     return;
   }
-
-  // Altro: cache-first, poi rete (e salva in cache i font Google ecc.)
-  e.respondWith(
-    caches.match(req).then((hit) => {
-      if (hit) return hit;
-      return fetch(req).then((res) => {
-        const copy = res.clone();
-        caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
-        return res;
-      }).catch(() => hit);
-    })
-  );
+  e.respondWith(caches.match(req).then(hit=> hit || fetch(req).then(res=>{
+    const copy=res.clone(); caches.open(CACHE).then(c=>c.put(req,copy)).catch(()=>{}); return res;
+  }).catch(()=>hit)));
 });

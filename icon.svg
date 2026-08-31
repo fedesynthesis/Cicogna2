@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7ec894"/><stop offset="1" stop-color="#2f7048"/>
+    </linearGradient>
+    <radialGradient id="disc" cx="38%" cy="30%" r="78%">
+      <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#e2f0e6"/>
+    </radialGradient>
+    <linearGradient id="head" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#c2e6cd"/><stop offset="1" stop-color="#8ec9a2"/>
+    </linearGradient>
+    <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".55"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="soft" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="12" stdDeviation="15" flood-color="#1d3a28" flood-opacity=".22"/>
+    </filter>
+    <filter id="softer" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="9" stdDeviation="10" flood-color="#1d3a28" flood-opacity=".18"/>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+
+  <g transform="scale(3.0118)">
+    <circle cx="85" cy="86" r="62" fill="none" stroke="#ffffff" stroke-opacity=".28" stroke-width="5"/>
+    <circle cx="85" cy="86" r="52" fill="url(#disc)" filter="url(#soft)"/>
+    <g filter="url(#softer)">
+      <path d="M85 124c-22 0-38-14-38-32 0-11 6-19 15-24 3-11 11-18 23-18s20 7 23 18c9 5 15 13 15 24 0 18-16 32-38 32z" fill="url(#head)"/>
+      <path d="M85 52c-11 0-19 7-22 17-6 4-11 9-13 15 8-9 20-15 35-15s27 6 35 15c-2-6-7-11-13-15-3-10-11-17-22-17z" fill="url(#gloss)"/>
+      <path d="M85 52c1-6 5-10 10-9" stroke="#3f8a58" stroke-width="5" stroke-linecap="round" fill="none"/>
+      <circle cx="71" cy="85" r="4.6" fill="#26342a"/><circle cx="99" cy="85" r="4.6" fill="#26342a"/>
+      <circle cx="72.4" cy="83.4" r="1.5" fill="#fff" opacity=".9"/><circle cx="100.4" cy="83.4" r="1.5" fill="#fff" opacity=".9"/>
+      <path d="M77 101c4.5 4.5 11.5 4.5 16 0" stroke="#26342a" stroke-width="4.4" stroke-linecap="round" fill="none"/>
+      <ellipse cx="60" cy="95" rx="6.5" ry="4.2" fill="#7cbf94" opacity=".55"/>
+      <ellipse cx="110" cy="95" rx="6.5" ry="4.2" fill="#7cbf94" opacity=".55"/>
+    </g>
+  </g>
+</svg>

@@ -1,35 +1,31 @@
 {
-  "name": "Cicogna · Lista nascita",
-  "short_name": "Cicogna",
-  "description": "La lista per l'arrivo del bebè: preparto, ospedale, neonato e postparto.",
-  "lang": "it",
-  "start_url": "/Cicogna2/?source=pwa",
+  "name": "Nido · Bebè",
+  "short_name": "Nido",
+  "description": "Diario del bebè: poppate, cambi, peso e liste",
+  "start_url": "/Cicogna2/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#eef7ef",
-  "theme_color": "#7cb98a",
+  "theme_color": "#eef7ef",
   "icons": [
     {
-      "src": "icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
     },
     {
-      "src": "icon-512.png",
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "./icon-512.png",
       "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
+      "type": "image/png"
     },
     {
-      "src": "icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "maskable"
-    },
-    {
-      "src": "icon-512.png",
+      "src": "./icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
