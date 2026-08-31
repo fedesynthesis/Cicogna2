@@ -606,6 +606,27 @@ function tapSubito(btn, fn){
 }
 /* ============ Render ============ */
 function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+/* Ridisegnare la schermata mentre si scrive cancellava il testo appena digitato
+   (succedeva a ogni aggiornamento della sincronizzazione): qui il contenuto dei
+   campi, il fuoco e la posizione del cursore vengono conservati. */
+function conservaCampi(fn){
+  const att=document.activeElement;
+  const chiave=(el)=> el.id ? "#"+el.id : (el.dataset && el.dataset.inew ? '[data-inew="'+el.dataset.inew+'"]' : null);
+  const salvati=[...document.querySelectorAll("#view input")].map(el=>({
+    sel:chiave(el), val:el.value,
+    attivo: el===att, start:el.selectionStart, end:el.selectionEnd
+  })).filter(x=>x.sel);
+  fn();
+  salvati.forEach(x=>{
+    const el=document.querySelector(x.sel);
+    if(!el) return;
+    if(x.val && !el.value) el.value=x.val;
+    if(x.attivo){
+      el.focus();
+      try{ if(x.start!=null) el.setSelectionRange(x.start,x.end); }catch(e){}
+    }
+  });
+}
 function render(){
   if(activeMacro==="bebe") renderBebe();
   else if(activeMacro==="fare") renderFare();
@@ -688,7 +709,7 @@ async function initSync(){
         else if(first){ const m=mergeUnion(state,data); SYNC_KEYS.forEach(k=> state[k]=m[k]); save(); }
         else { SYNC_KEYS.forEach(k=>{ if(data[k]!=null) state[k]=data[k]; }); try{ localStorage.setItem(KEY,JSON.stringify(state)); }catch(e){} }
         localStorage.setItem(SYNC_INIT,"1");
-        render();
+        conservaCampi(render);   // non cancellare quello che si sta scrivendo
       },
       (err)=>{ setConn("off","Sync non disponibile"); console.warn("Sync:", err); }
     );
