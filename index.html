@@ -511,7 +511,7 @@ function renderFare(){
   const addFn=()=>{ const val=inp.value.trim(); if(!val) return;
     state.tasks.unshift({id:uid(), text:val, who:taskWho, done:false, at:Date.now()});
     inp.value=""; save(); render(); };
-  v.querySelector("#tadd").onclick=addFn;
+  tapSubito(v.querySelector("#tadd"), addFn);
   inp.onkeydown=(e)=>{ if(e.key==="Enter") addFn(); };
   v.querySelectorAll("[data-tg]").forEach(b=> b.onclick=()=>{ const t=state.tasks.find(x=>x.id===b.dataset.tg); if(t){ t.done=!t.done; save(); render(); } });
   v.querySelectorAll("[data-tdel]").forEach(b=> b.onclick=()=>{ state.tasks=state.tasks.filter(x=>x.id!==b.dataset.tdel); save(); render(); });
@@ -574,7 +574,7 @@ function renderListe(){
     const [lid,iid]=b.dataset.idel.split("::"); const l=state.lists.find(x=>x.id===lid);
     if(l){ l.items=l.items.filter(x=>x.id!==iid); save(); render(); }
   });
-  v.querySelectorAll("[data-iadd]").forEach(b=> b.onclick=()=>addItem(b.dataset.iadd));
+  v.querySelectorAll("[data-iadd]").forEach(b=> tapSubito(b, ()=>addItem(b.dataset.iadd)));
   v.querySelectorAll("[data-inew]").forEach(i=> i.onkeydown=(e)=>{ if(e.key==="Enter") addItem(i.dataset.inew); });
   const ac=v.querySelector("#laddcard");
   if(ac) ac.onclick=()=>{
@@ -592,6 +592,11 @@ function addItem(lid){
   const again=document.querySelector('[data-inew="'+lid+'"]'); if(again) again.focus();
 }
 
+function tapSubito(btn, fn){
+  if(!btn) return;
+  btn.addEventListener("pointerdown", function(e){ e.preventDefault(); });   // non far perdere il fuoco al campo
+  btn.addEventListener("click", fn);
+}
 /* ============ Render ============ */
 function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 function render(){
