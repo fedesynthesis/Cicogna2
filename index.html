@@ -510,7 +510,9 @@ function renderFare(){
   const inp=v.querySelector("#tnew");
   const addFn=()=>{ const val=inp.value.trim(); if(!val) return;
     state.tasks.unshift({id:uid(), text:val, who:taskWho, done:false, at:Date.now()});
-    inp.value=""; save(); render(); };
+    inp.value=""; save(); render();
+    const again=document.querySelector("#tnew"); if(again) again.focus();   // pronto per il prossimo
+  };
   tapSubito(v.querySelector("#tadd"), addFn);
   inp.onkeydown=(e)=>{ if(e.key==="Enter") addFn(); };
   v.querySelectorAll("[data-tg]").forEach(b=> b.onclick=()=>{ const t=state.tasks.find(x=>x.id===b.dataset.tg); if(t){ t.done=!t.done; save(); render(); } });
