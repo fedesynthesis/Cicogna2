@@ -594,10 +594,15 @@ function addItem(lid){
   const again=document.querySelector('[data-inew="'+lid+'"]'); if(again) again.focus();
 }
 
+/* Il tasto deve rispondere al primo tocco anche con la tastiera aperta.
+   NB: bloccare il pointerdown impedisce del tutto il click su iOS (provato):
+   qui si agisce al sollevamento del dito, con una guardia contro il doppio scatto. */
 function tapSubito(btn, fn){
   if(!btn) return;
-  btn.addEventListener("pointerdown", function(e){ e.preventDefault(); });   // non far perdere il fuoco al campo
-  btn.addEventListener("click", fn);
+  let ultimo=0;
+  const run=(e)=>{ const ora=Date.now(); if(ora-ultimo<400) return; ultimo=ora; fn(e); };
+  btn.addEventListener("pointerup", run);
+  btn.addEventListener("click", run);
 }
 /* ============ Render ============ */
 function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
