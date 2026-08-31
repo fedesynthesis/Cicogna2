@@ -489,11 +489,12 @@ const WHO={fede:"Fede", sara:"Sara", tutti:"Tutti"};
 function renderFare(){
   const v=document.getElementById("view");
   const open=state.tasks.filter(t=>!t.done), done=state.tasks.filter(t=>t.done);
-  let h='<div class="card"><div class="add">'
-    + '<input id="tnew" type="text" placeholder="Cosa c\'è da fare…"><button id="tadd">+</button></div>'
-    + '<div class="seg" id="twho">'
-      + Object.keys(WHO).map(k=>'<button data-w="'+k+'" class="'+(taskWho===k?"on":"")+'">'+WHO[k]+'</button>').join("")
-    + '</div>';
+  let h='<div class="card"><div class="card-head" style="cursor:default">'
+    + '<div class="card-emoji">✅</div>'
+    + '<div class="card-title"><h2>Da fare</h2><div class="meta">'
+    + (state.tasks.length? open.length+" da fare · "+done.length+" fatte" : "niente in sospeso")
+    + '</div></div>'
+    + '<button class="sez-add" id="taddbtn" aria-label="Aggiungi compito">+</button></div>';
   if(!state.tasks.length){
     h += '<div class="empty"><span class="e">📝</span>Ancora niente da fare.</div>';
   } else {
@@ -506,15 +507,7 @@ function renderFare(){
   h += '</div>';
   v.innerHTML=h;
 
-  v.querySelectorAll("#twho button").forEach(b=> b.onclick=()=>{ taskWho=b.dataset.w; render(); });
-  const inp=v.querySelector("#tnew");
-  const addFn=()=>{ const val=inp.value.trim(); if(!val) return;
-    state.tasks.unshift({id:uid(), text:val, who:taskWho, done:false, at:Date.now()});
-    inp.value=""; save(); render();
-    const again=document.querySelector("#tnew"); if(again) again.focus();   // pronto per il prossimo
-  };
-  tapSubito(v.querySelector("#tadd"), addFn);
-  inp.onkeydown=(e)=>{ if(e.key==="Enter") addFn(); };
+  tapSubito(v.querySelector("#taddbtn"), ()=>openTask());
   v.querySelectorAll("[data-tg]").forEach(b=> b.onclick=()=>{ const t=state.tasks.find(x=>x.id===b.dataset.tg); if(t){ t.done=!t.done; save(); render(); } });
   v.querySelectorAll("[data-tdel]").forEach(b=> b.onclick=()=>{ state.tasks=state.tasks.filter(x=>x.id!==b.dataset.tdel); save(); render(); });
 }
@@ -541,7 +534,7 @@ function renderListe(){
     h += '<div class="card"><div class="card-head" data-open="'+l.id+'">'
       + '<div class="card-emoji">'+l.emoji+'</div>'
       + '<div class="card-title"><h2>'+esc(l.name)+'</h2><div class="meta">'+(l.items.length?done+" di "+l.items.length+" presi":"vuota")+'</div></div>'
-      + (editMode?'<button class="card-del" data-ldel="'+l.id+'">🗑</button>':'<div class="card-count">'+done+"/"+l.items.length+'</div>')
+      + (editMode?'<button class="card-del" data-ldel="'+l.id+'">🗑</button>':'<button class="sez-add" data-iadd="'+l.id+'" aria-label="Aggiungi in '+esc(l.name)+'">+</button>')
       + '</div>';
     if(open){
       l.items.forEach(i=>{
@@ -550,7 +543,7 @@ function renderListe(){
           + '<div class="t">'+esc(i.text)+'</div>'
           + '<button class="del" data-idel="'+l.id+"::"+i.id+'">🗑</button></div>';
       });
-      h += '<div class="add"><input type="text" data-inew="'+l.id+'" placeholder="Aggiungi…"><button data-iadd="'+l.id+'">+</button></div>';
+
     }
     h += '</div>';
   });
@@ -576,8 +569,7 @@ function renderListe(){
     const [lid,iid]=b.dataset.idel.split("::"); const l=state.lists.find(x=>x.id===lid);
     if(l){ l.items=l.items.filter(x=>x.id!==iid); save(); render(); }
   });
-  v.querySelectorAll("[data-iadd]").forEach(b=> tapSubito(b, ()=>addItem(b.dataset.iadd)));
-  v.querySelectorAll("[data-inew]").forEach(i=> i.onkeydown=(e)=>{ if(e.key==="Enter") addItem(i.dataset.inew); });
+  v.querySelectorAll("[data-iadd]").forEach(b=> tapSubito(b, (e)=>{ if(e&&e.stopPropagation) e.stopPropagation(); openVoce(b.dataset.iadd); }));
   const ac=v.querySelector("#laddcard");
   if(ac) ac.onclick=()=>{
     const name=(prompt("Nome della nuova sezione (es. Pannolini)")||"").trim(); if(!name) return;
@@ -585,18 +577,9 @@ function renderListe(){
     state.lists.push({id:uid(), emoji:emoji, name:name, items:[]}); save(); render(); toast("Sezione aggiunta");
   };
 }
-function addItem(lid){
-  const inp=document.querySelector('[data-inew="'+lid+'"]'); if(!inp) return;
-  const val=inp.value.trim(); if(!val) return;
-  const l=state.lists.find(x=>x.id===lid); if(!l) return;
-  l.items.push({id:uid(), text:val, done:false});
-  inp.value=""; save(); render();
-  const again=document.querySelector('[data-inew="'+lid+'"]'); if(again) again.focus();
-}
-
 /* Il tasto deve rispondere al primo tocco anche con la tastiera aperta.
-   NB: bloccare il pointerdown impedisce del tutto il click su iOS (provato):
-   qui si agisce al sollevamento del dito, con una guardia contro il doppio scatto. */
+   NB: bloccare il pointerdown impedisce del tutto il click su iOS: qui si agisce
+   al sollevamento del dito, con una guardia contro il doppio scatto. */
 function tapSubito(btn, fn){
   if(!btn) return;
   let ultimo=0;
@@ -604,6 +587,56 @@ function tapSubito(btn, fn){
   btn.addEventListener("pointerup", run);
   btn.addEventListener("click", run);
 }
+
+/* ---- Schedine di inserimento (stesso meccanismo della sezione Bebè) ---- */
+function openTask(){
+  const s=document.getElementById("sheet");
+  s.innerHTML =
+    '<h3>Nuovo compito</h3><div class="hint">Cosa c\'è da fare</div>'
+    + '<div class="lbl">Descrizione</div><div class="fld"><input id="tktxt" type="text" placeholder="es. chiamare il pediatra"></div>'
+    + '<div class="lbl">Di chi è</div><div class="opts" id="tkwho">'
+      + Object.keys(WHO).map(k=>'<button data-w="'+k+'" class="'+(taskWho===k?"on":"")+'">'+WHO[k]+'</button>').join("")
+    + '</div>'
+    + '<button class="go" id="tkgo">Aggiungi</button>'
+    + '<button class="cancel" id="tkcancel">Annulla</button>';
+  document.getElementById("scrim").classList.add("on");
+  s.querySelectorAll("#tkwho button").forEach(b=> b.onclick=()=>{
+    taskWho=b.dataset.w;
+    s.querySelectorAll("#tkwho button").forEach(x=> x.classList.toggle("on", x.dataset.w===taskWho));
+  });
+  const go=()=>{
+    const val=(s.querySelector("#tktxt").value||"").trim();
+    if(!val){ toast("Scrivi cosa c\'è da fare"); return; }
+    state.tasks.unshift({id:uid(), text:val, who:taskWho, done:false, at:Date.now()});
+    save(); document.getElementById("scrim").classList.remove("on"); render(); toast("Aggiunto");
+  };
+  tapSubito(s.querySelector("#tkgo"), go);
+  s.querySelector("#tktxt").onkeydown=(e)=>{ if(e.key==="Enter") go(); };
+  s.querySelector("#tkcancel").onclick=()=>document.getElementById("scrim").classList.remove("on");
+  setTimeout(()=>{ const i=s.querySelector("#tktxt"); if(i) i.focus(); },250);
+}
+function openVoce(lid){
+  const l=state.lists.find(x=>x.id===lid); if(!l) return;
+  const s=document.getElementById("sheet");
+  s.innerHTML =
+    '<h3>'+esc(l.name)+'</h3><div class="hint">Cosa aggiungo alla lista</div>'
+    + '<div class="lbl">Voce</div><div class="fld"><input id="vctxt" type="text" placeholder="es. crema cambio"></div>'
+    + '<button class="go" id="vcgo">Aggiungi</button>'
+    + '<button class="cancel" id="vccancel">Annulla</button>';
+  document.getElementById("scrim").classList.add("on");
+  const go=()=>{
+    const val=(s.querySelector("#vctxt").value||"").trim();
+    if(!val){ toast("Scrivi una voce"); return; }
+    l.items.push({id:uid(), text:val, done:false});
+    state.open[l.id]=true;
+    save(); document.getElementById("scrim").classList.remove("on"); render(); toast("Aggiunto");
+  };
+  tapSubito(s.querySelector("#vcgo"), go);
+  s.querySelector("#vctxt").onkeydown=(e)=>{ if(e.key==="Enter") go(); };
+  s.querySelector("#vccancel").onclick=()=>document.getElementById("scrim").classList.remove("on");
+  setTimeout(()=>{ const i=s.querySelector("#vctxt"); if(i) i.focus(); },250);
+}
+
 /* ============ Render ============ */
 function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 /* Ridisegnare la schermata mentre si scrive cancellava il testo appena digitato
