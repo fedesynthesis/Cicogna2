@@ -67,16 +67,16 @@
   /* linguette da schedario: si sovrappongono leggermente, come le cartelline */
   .schede{display:flex;align-items:flex-end;margin:16px 0 0;padding-left:2px}
   .scheda{flex:1;min-width:0;background:var(--catbg,var(--bg2));border:1px solid rgba(38,52,42,.07);border-bottom:none;
-    border-radius:13px 13px 0 0;padding:8px 4px 9px 12px;margin-left:-11px;
+    border-radius:12px 12px 0 0;padding:8px 2px 9px 8px;margin-left:-7px;
     display:flex;flex-direction:column;align-items:center;gap:1px;cursor:pointer;
     box-shadow:2px -2px 6px rgba(38,52,42,.06);transition:.16s;position:relative}
-  .scheda:first-child{margin-left:0;padding-left:6px}
+  .scheda:first-child{margin-left:0;padding-left:4px}
   .scheda:nth-child(1){z-index:4} .scheda:nth-child(2){z-index:3}
   .scheda:nth-child(3){z-index:2} .scheda:nth-child(4){z-index:1}
-  .scheda .ic{font-size:19px;line-height:1.15}
-  .scheda .ti{font-family:'Quicksand';font-weight:700;font-size:11px;color:var(--ink-soft);line-height:1.2;
+  .scheda .ic{font-size:17px;line-height:1.15}
+  .scheda .ti{font-family:'Quicksand';font-weight:700;font-size:9.8px;color:var(--ink-soft);line-height:1.2;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-  .scheda .nm{font-size:9px;color:var(--ink-soft);opacity:.75;line-height:1.2;white-space:nowrap}
+  .scheda .nm{font-size:8.5px;color:var(--ink-soft);opacity:.75;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
   .scheda .ti{color:var(--cat,var(--ink-soft))}
   .scheda:not(.on){opacity:.7}
   /* aperta: stessa tinta dell'etichetta, che prosegue nel foglio sotto */
@@ -298,7 +298,7 @@ function openEvent(type, id){
   if(e){
     const d=new Date(e.at);
     draft={ id:e.id, type:e.type, kind:e.kind||"pipi", mode:e.mode||"seno", side:e.side||"sx",
-            amount:e.amount||null, min:e.min||"", ml:e.ml||"", note:e.note||"",
+            amount:e.amount||null, stato:e.stato||null, min:e.min||"", ml:e.ml||"", note:e.note||"",
             date: d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"),
             time: String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0") };
   } else {
@@ -311,8 +311,8 @@ function closeSheet(){ document.getElementById("scrim").classList.remove("on"); 
 
 function renderSheetEvent(){
   const f=draft, s=document.getElementById("sheet");
-  const titolo = (f.id?"Modifica ":"") + (f.type==="diaper" ? "cambio" : f.type==="feed" ? "poppata" : "vomito");
-  const hint   = f.type==="diaper" ? "Cosa ha fatto" : f.type==="feed" ? "Come ha mangiato" : "Quando è successo";
+  const titolo = (f.id?"Modifica ":"") + (f.type==="diaper" ? "cambio" : f.type==="feed" ? "poppata" : f.type==="cord" ? "medicazione" : "vomito");
+  const hint   = f.type==="diaper" ? "Cosa ha fatto" : f.type==="feed" ? "Come ha mangiato" : f.type==="cord" ? "Cordone ombelicale" : "Quando è successo";
 
   let campi="";
   if(f.type==="diaper"){
@@ -334,6 +334,13 @@ function renderSheetEvent(){
           : f.mode==="biberon"
           ? '<div class="lbl">Quantità</div><div class="fld"><input id="fml" type="number" inputmode="numeric" placeholder="quanti ml" value="'+(f.ml||"")+'"><span class="u">ml</span></div>'
           : '<div class="lbl">Cosa</div><div class="fld"><input id="fcosa" type="text" placeholder="es. pappa di verdure" value="'+esc(f.note||"")+'"></div>');
+  } else if(f.type==="cord"){
+    campi = '<div class="lbl">Come si presenta</div><div class="opts" id="cst">'
+      + '<button data-c="asciutto" class="'+(f.stato==="asciutto"?"on":"")+'">Asciutto</button>'
+      + '<button data-c="umido" class="'+(f.stato==="umido"?"on":"")+'">Umido</button>'
+      + '<button data-c="arrossato" class="'+(f.stato==="arrossato"?"on":"")+'">Arrossato</button></div>'
+      + '<div class="opts" style="margin-top:8px" id="cst2">'
+      + '<button data-c="caduto" class="'+(f.stato==="caduto"?"on":"")+'">🎉 È caduto</button></div>';
   } else {
     campi = '<div class="lbl">Quanto</div><div class="opts" id="vamt">'
       + '<button data-v="poco" class="'+(f.amount==="poco"?"on":"")+'">Poco</button>'
@@ -355,6 +362,7 @@ function renderSheetEvent(){
   const fm=s.querySelector("#fmode");  if(fm) fm.querySelectorAll("button").forEach(b=> b.onclick=()=>{ keep(); draft.mode=b.dataset.m; renderSheetEvent(); });
   const fs=s.querySelector("#fside");  if(fs) fs.querySelectorAll("button").forEach(b=> b.onclick=()=>{ keep(); draft.side=b.dataset.s; renderSheetEvent(); });
   const va=s.querySelector("#vamt");   if(va) va.querySelectorAll("button").forEach(b=> b.onclick=()=>{ keep(); draft.amount=b.dataset.v; renderSheetEvent(); });
+  ["#cst","#cst2"].forEach(sel=>{ const g=s.querySelector(sel); if(g) g.querySelectorAll("button").forEach(b=> b.onclick=()=>{ keep(); draft.stato=b.dataset.c; renderSheetEvent(); }); });
 
   s.querySelector("#ego").onclick=()=>{
     keep();
@@ -369,7 +377,8 @@ function renderSheetEvent(){
       ev.min=min?(parseInt(min.value,10)||null):null;
       ev.ml=ml?(parseInt(ml.value,10)||null):null;
       if(cosa && cosa.value.trim()) ev.note=cosa.value.trim();
-    } else { ev.amount=draft.amount||null; }
+    } else if(draft.type==="cord"){ ev.stato=draft.stato||null; }
+    else { ev.amount=draft.amount||null; }
     const modifica = !!draft.id;
     if(modifica){ ev.id=draft.id; state.events=state.events.map(x=> x.id===draft.id ? ev : x); }
     else state.events.unshift(ev);
@@ -394,6 +403,7 @@ function renderBebe(){
   const nDiaper=todays.filter(e=>e.type==="diaper").length;
   const nFeed=todays.filter(e=>e.type==="feed").length;
   const nVomit=todays.filter(e=>e.type==="vomit").length;
+  const nCord=todays.filter(e=>e.type==="cord").length;
   const w=state.weights.slice().sort((a,b)=>b.at-a.at);
 
   const SCHEDE=[
@@ -403,6 +413,8 @@ function renderBebe(){
       bg:"#f7e9dd", fg:"#a2703f" },
     { k:"diaper", emoji:"🧷", titolo:"Cambio",  oggi:nDiaper, righe:ev.filter(e=>e.type==="diaper"),
       bg:"#fbf1d8", fg:"#9a7b16" },
+    { k:"cord",   emoji:"🩹", titolo:"Cordone", oggi:nCord,   righe:ev.filter(e=>e.type==="cord"),
+      bg:"#ece7f5", fg:"#6f5b9b" },
     { k:"weight", emoji:"⚖️", titolo:"Peso",    oggi:null,    righe:w,
       bg:"#e3edf6", fg:"#4f7ea3" }
   ];
@@ -447,6 +459,7 @@ function renderBebe(){
         let tit;
         if(e.type==="feed")       tit=(e.mode==="seno"?"🤱 ":e.mode==="biberon"?"🍼 ":"🥄 ")+feedText(e);
         else if(e.type==="vomit") tit="Vomito"+(e.amount?" · "+e.amount:"");
+        else if(e.type==="cord") tit=(e.stato==="caduto"?"🎉 Cordone caduto":"Medicazione"+(e.stato?" · "+e.stato:""));
         else                      tit=(KINDS[e.kind]||KINDS.pipi).e+" "+(KINDS[e.kind]||KINDS.pipi).t;
         h += '<div class="ev tocca" data-edit="'+e.id+'"><div class="dot">'+dayShort(e.at)+'</div>'
           + '<div class="txt"><b>'+tit+'</b>'+(e.note?'<span>'+esc(e.note)+'</span>':'')+'</div>'
