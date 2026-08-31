@@ -614,7 +614,9 @@ const FB_CONFIG={
   messagingSenderId: "1013139034396",
   appId:             "1:1013139034396:web:4770893e05130ca600aad9"
 };
-const ROOM_COL="nido_rooms", ROOM_DOC="casa";     // ← dati SEPARATI da quelli di Cicogna
+/* Le regole del progetto autorizzano solo questo documento: ci scriviamo dentro i nostri
+   campi SENZA toccare quelli della vecchia lista nascita (vedi merge:true più sotto). */
+const ROOM_COL="LL09Rb8OO0yjHQnJBsPCPSu1", ROOM_DOC="YXZm9MNsAFCNNQiTgQnU7LEg";
 const SYNC_KEYS=["events","tasks","lists","weights"];
 const SYNC_INIT="nido_sync_init";
 let FB=null, fdoc=null, fbReady=false, pendingWrite=false, dirty=false, pushTimer=null;
@@ -633,7 +635,7 @@ function scheduleCloudPush(){
 async function cloudPush(){
   if(!fbReady) return;
   pendingWrite=true;
-  try{ await FB.setDoc(fdoc, syncedSubset(state)); dirty=false; }
+  try{ await FB.setDoc(fdoc, syncedSubset(state), {merge:true}); dirty=false; }   // merge: non cancella i dati della lista nascita
   catch(e){ console.warn("push", e); }
   pendingWrite=false;
 }
