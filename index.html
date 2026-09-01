@@ -38,6 +38,22 @@
     padding:6px 14px;margin-top:12px;font-size:13px;color:var(--ink-soft);box-shadow:var(--shadow-soft)}
   .sync .d{width:9px;height:9px;border-radius:50%;background:var(--butter)}
   .sync .d.on{background:var(--sage)} .sync .d.off{background:var(--coral)}
+  .share-btn{display:inline-flex;align-items:center;gap:7px;margin-top:10px;border:none;cursor:pointer;
+    background:var(--sage);color:#fff;border-radius:99px;padding:9px 18px;
+    font-family:'Quicksand';font-weight:700;font-size:13.5px;box-shadow:var(--shadow-soft)}
+  .share-btn:active{transform:scale(.96)}
+  .exp-seg{display:flex;gap:6px;margin:14px 0 4px}
+  .exp-seg button{flex:1;border:1.5px solid var(--line);background:var(--surface);color:var(--ink-soft);
+    font-family:'Quicksand';font-weight:600;font-size:13px;padding:9px;border-radius:12px;cursor:pointer}
+  .exp-seg button.on{background:var(--ink);border-color:var(--ink);color:#fff}
+  .exp-box{width:100%;height:280px;border:1.5px solid var(--line);border-radius:16px;padding:14px;
+    background:var(--bg);color:var(--ink);font-family:ui-monospace,Menlo,monospace;font-size:12.5px;
+    line-height:1.5;white-space:pre-wrap;overflow-y:auto;resize:none;-webkit-user-select:text;user-select:text}
+  .exp-actions{display:flex;gap:10px;margin-top:16px}
+  .exp-actions button{flex:1;border:none;border-radius:16px;padding:15px;cursor:pointer;
+    font-family:'Quicksand';font-weight:700;font-size:15px}
+  .exp-actions .prim{background:var(--sage);color:#fff}
+  .exp-actions .sec{background:var(--sage-bg);color:var(--sage)}
 
   /* macro */
   .macro{display:flex;gap:8px;background:var(--surface);border-radius:var(--r);padding:6px;
@@ -210,6 +226,7 @@
       <h1>Nido</h1>
       <div class="sub" id="sub">Il diario del bebè</div>
       <div class="sync"><span class="d" id="syncDot"></span><span id="syncTxt">Connessione…</span></div>
+      <div><button class="share-btn" id="expBtn">📤 Esporta e condividi</button></div>
     </header>
 
     <div class="macro" id="macro"></div>
@@ -789,10 +806,115 @@ async function initSync(){
   }catch(e){ setConn("off","Sync non disponibile"); console.warn("Sync non attivo:", e); }
 }
 
+/* ============ Esporta e condividi ============ */
+const CORD_LABEL={asciutto:"asciutto", umido:"umido", arrossato:"arrossato", caduto:"caduto 🎉"};
+function eventoTesto(e){
+  if(e.type==="feed")  return "🍼 Poppata · "+feedText(e)+(e.mode!=="solido"&&e.note?" · "+e.note:"");
+  if(e.type==="diaper")return "🧷 Cambio · "+((KINDS[e.kind]||KINDS.pipi).t)+(e.note?" · "+e.note:"");
+  if(e.type==="vomit") return "🤢 Vomito"+(e.amount?" · "+e.amount:"")+(e.note?" · "+e.note:"");
+  if(e.type==="cord")  return "🩹 Cordone · "+((CORD_LABEL[e.stato]||e.stato||"medicazione"))+(e.note?" · "+e.note:"");
+  return "•";
+}
+function buildReport(period){
+  const now=Date.now();
+  const soglia = period==="oggi" ? now-0 : period==="7" ? now-7*86400000 : 0;
+  const inPeriodo = (ms)=> period==="oggi" ? dayKey(ms)===dayKey(now) : (period==="7" ? ms>=soglia : true);
+
+  let L=[];
+  L.push("🍼 NIDO — Diario del bebè");
+  L.push("Aggiornato al "+fmtDate(now)+" "+hhmm(now));
+  L.push("");
+
+  // --- eventi raggruppati per giorno ---
+  const ev=(state.events||[]).filter(e=>inPeriodo(e.at)).slice().sort((a,b)=>a.at-b.at);
+  const giorni={};
+  ev.forEach(e=>{ (giorni[dayKey(e.at)]=giorni[dayKey(e.at)]||[]).push(e); });
+  const chiavi=Object.keys(giorni).sort().reverse();
+  if(!chiavi.length){ L.push("— Nessun evento nel periodo —"); L.push(""); }
+  chiavi.forEach(k=>{
+    const list=giorni[k];
+    const nf=list.filter(e=>e.type==="feed").length, nd=list.filter(e=>e.type==="diaper").length, nv=list.filter(e=>e.type==="vomit").length;
+    const pl=(n,s,p)=> n+" "+(n===1?s:p);
+    L.push("📅 "+dayLabel(k).toUpperCase()+"  ("+pl(nf,"poppata","poppate")+" · "+pl(nd,"cambio","cambi")+(nv?" · "+pl(nv,"vomito","vomiti"):"")+")");
+    list.forEach(e=>{ L.push("   "+hhmm(e.at)+"  "+eventoTesto(e)); });
+    L.push("");
+  });
+
+  // --- peso ---
+  const w=(state.weights||[]).filter(x=>inPeriodo(x.at)).slice().sort((a,b)=>b.at-a.at);
+  if(w.length){
+    L.push("⚖️ PESO");
+    w.forEach((x,i)=>{ const prev=w[i+1];
+      const diff=prev ? " ("+(x.kg>=prev.kg?"+":"−")+Math.abs(Math.round((x.kg-prev.kg)*1000))+" g)" : "";
+      L.push("   "+fmtDate(x.at)+"  "+fmtKg(x.kg)+" kg"+diff+(x.note?" · "+x.note:"")); });
+    L.push("");
+  }
+
+  // --- da fare ---
+  const t=(state.tasks||[]);
+  if(t.length){
+    L.push("✅ DA FARE");
+    t.filter(x=>!x.done).forEach(x=> L.push("   ☐ "+x.text+" ("+(WHO[x.who]||x.who)+")"));
+    t.filter(x=>x.done).forEach(x=> L.push("   ☑ "+x.text+" ("+(WHO[x.who]||x.who)+")"));
+    L.push("");
+  }
+
+  // --- liste ---
+  const listeConVoci=(state.lists||[]).filter(l=>(l.items||[]).length);
+  if(listeConVoci.length){
+    L.push("🛒 LISTE");
+    listeConVoci.forEach(l=>{
+      L.push("   "+l.emoji+" "+l.name);
+      (l.items||[]).forEach(i=> L.push("      "+(i.done?"☑":"☐")+" "+i.text));
+    });
+    L.push("");
+  }
+
+  return L.join("\n").replace(/\n{3,}/g,"\n\n").trim()+"\n";
+}
+
+let expPeriod="7";
+function openExport(){
+  const s=document.getElementById("sheet");
+  const render=()=>{
+    s.innerHTML =
+      '<h3>Esporta e condividi</h3><div class="hint">Il diario in un testo pronto da inviare</div>'
+      + '<div class="exp-seg" id="expseg">'
+        + '<button data-p="oggi" class="'+(expPeriod==="oggi"?"on":"")+'">Oggi</button>'
+        + '<button data-p="7" class="'+(expPeriod==="7"?"on":"")+'">Ultimi 7 giorni</button>'
+        + '<button data-p="all" class="'+(expPeriod==="all"?"on":"")+'">Tutto</button></div>'
+      + '<textarea class="exp-box" id="exptxt" readonly></textarea>'
+      + '<div class="exp-actions">'
+        + '<button class="prim" id="expshare">Condividi</button>'
+        + '<button class="sec" id="expcopy">Copia</button></div>'
+      + '<button class="cancel" id="expclose">Chiudi</button>';
+    const ta=s.querySelector("#exptxt"); ta.value=buildReport(expPeriod);
+    s.querySelectorAll("#expseg button").forEach(b=> b.onclick=()=>{ expPeriod=b.dataset.p; render(); });
+    tapSubito(s.querySelector("#expshare"), async ()=>{
+      const testo=ta.value;
+      if(navigator.share){
+        try{ await navigator.share({title:"Nido — Diario del bebè", text:testo}); }
+        catch(e){ /* annullato dall'utente */ }
+      } else { await copia(testo); toast("Condivisione non disponibile: testo copiato"); }
+    });
+    tapSubito(s.querySelector("#expcopy"), ()=> copia(ta.value).then(()=>toast("Copiato ✓")).catch(()=>{
+      ta.focus(); ta.setSelectionRange(0, ta.value.length); toast("Seleziona e copia");
+    }));
+    s.querySelector("#expclose").onclick=()=>document.getElementById("scrim").classList.remove("on");
+  };
+  render();
+  document.getElementById("scrim").classList.add("on");
+}
+async function copia(testo){
+  if(navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(testo);
+  return Promise.reject();
+}
+
 /* ============ Avvio ============ */
 buildMacro();
 render();
 initSync();
+document.getElementById("expBtn").addEventListener("click", openExport);
 if("serviceWorker" in navigator){ window.addEventListener("load", ()=>navigator.serviceWorker.register("sw.js").catch(()=>{})); }
 </script>
 <script src="/hub/bar.js" defer></script>
