@@ -54,6 +54,18 @@
     font-family:'Quicksand';font-weight:700;font-size:15px}
   .exp-actions .prim{background:var(--sage);color:#fff}
   .exp-actions .sec{background:var(--sage-bg);color:var(--sage)}
+  .hdr-actions{display:flex;gap:8px;justify-content:center;margin-top:10px;flex-wrap:wrap}
+  .hdr-actions .share-btn{margin-top:0}
+  .share-btn.alt{background:var(--surface);color:var(--sage);box-shadow:var(--shadow-soft)}
+  /* grafico */
+  .ch-legend{display:flex;flex-wrap:wrap;gap:7px;margin:14px 0 6px}
+  .ch-chip{display:inline-flex;align-items:center;gap:6px;border:1.5px solid var(--line);background:var(--surface);
+    color:var(--ink-soft);border-radius:99px;padding:7px 12px;font-family:'Quicksand';font-weight:600;font-size:12.5px;cursor:pointer}
+  .ch-chip .dot{width:11px;height:11px;border-radius:50%;background:currentColor}
+  .ch-chip.on{color:#fff}
+  .ch-wrap{border:1.5px solid var(--line);border-radius:16px;background:var(--surface);padding:8px 6px 4px;overflow-x:auto}
+  .ch-wrap svg{display:block;width:100%;height:auto}
+  .ch-empty{text-align:center;color:var(--ink-soft);padding:30px 16px;font-size:14px}
 
   /* macro */
   .macro{display:flex;gap:8px;background:var(--surface);border-radius:var(--r);padding:6px;
@@ -226,7 +238,10 @@
       <h1>Nido</h1>
       <div class="sub" id="sub">Il diario del bebè</div>
       <div class="sync"><span class="d" id="syncDot"></span><span id="syncTxt">Connessione…</span></div>
-      <div><button class="share-btn" id="expBtn">📤 Esporta e condividi</button></div>
+      <div class="hdr-actions">
+        <button class="share-btn" id="chartBtn">📈 Andamento</button>
+        <button class="share-btn" id="expBtn">📤 Esporta</button>
+      </div>
     </header>
 
     <div class="macro" id="macro"></div>
@@ -924,11 +939,135 @@ async function copia(testo){
   return Promise.reject();
 }
 
+/* ============ Grafico andamento ============ */
+const CH_SERIES=[
+  {k:"feed",   nome:"Poppate", col:"#3f8a58", axis:"count"},
+  {k:"diaper", nome:"Cambi",   col:"#c39a1f", axis:"count"},
+  {k:"vomit",  nome:"Vomito",  col:"#a2703f", axis:"count"},
+  {k:"cord",   nome:"Cordone", col:"#6f5b9b", axis:"count"},
+  {k:"weight", nome:"Peso",    col:"#4f7ea3", axis:"kg"}
+];
+let chartVisible={feed:true, diaper:true, vomit:false, cord:false, weight:true};
+let chartPeriod="14";
+
+function chDays(period){
+  const now=Date.now(); const oggi=dayKey(now);
+  // ultimo giorno = oggi o l'ultima data con dati
+  let all=[]; (state.events||[]).forEach(e=>all.push(e.at)); (state.weights||[]).forEach(w=>all.push(w.at));
+  const maxMs = all.length ? Math.max(now, Math.max.apply(null,all)) : now;
+  let n = period==="7"?7 : period==="14"?14 : period==="30"?30 : 0;
+  let minMs;
+  if(n){ minMs = maxMs - (n-1)*86400000; }
+  else { minMs = all.length ? Math.min.apply(null,all) : maxMs; }   // "tutto"
+  const days=[]; let d=new Date(minMs); d.setHours(12,0,0,0);
+  const end=new Date(maxMs); end.setHours(12,0,0,0);
+  while(d.getTime()<=end.getTime()){ days.push(dayKey(d.getTime())); d=new Date(d.getTime()+86400000); }
+  if(!days.length) days.push(oggi);
+  return days;
+}
+function chDataFor(k, days){
+  if(k==="weight"){
+    // punti reali (kg) sui giorni in cui c'è una pesata; media se più d'una
+    const byDay={};
+    (state.weights||[]).forEach(w=>{ const key=dayKey(w.at); (byDay[key]=byDay[key]||[]).push(w.kg); });
+    return days.map(key=> byDay[key] ? {v: byDay[key].reduce((a,b)=>a+b,0)/byDay[key].length} : null);
+  }
+  const byDay={};
+  (state.events||[]).filter(e=>e.type===k).forEach(e=>{ const key=dayKey(e.at); byDay[key]=(byDay[key]||0)+1; });
+  return days.map(key=> ({v: byDay[key]||0}) );
+}
+function buildChartSVG(){
+  const days=chDays(chartPeriod);
+  const n=days.length;
+  const W=340, H=210, padL=26, padR=34, padT=14, padB=30;
+  const plotW=W-padL-padR, plotH=H-padT-padB;
+  const X=(i)=> padL + (n<=1?plotW/2:(i/(n-1))*plotW);
+
+  // scala conteggi (serie count visibili)
+  let maxCount=0;
+  CH_SERIES.filter(s=>s.axis==="count"&&chartVisible[s.k]).forEach(s=>{
+    chDataFor(s.k,days).forEach(p=>{ if(p&&p.v>maxCount) maxCount=p.v; });
+  });
+  maxCount=Math.max(maxCount, 3);
+  const Yc=(v)=> padT + plotH - (v/maxCount)*plotH;
+
+  // scala peso
+  const wPts=chDataFor("weight",days).map((p,i)=>p?{i,v:p.v}:null).filter(Boolean);
+  let wMin=Infinity, wMax=-Infinity; wPts.forEach(p=>{ wMin=Math.min(wMin,p.v); wMax=Math.max(wMax,p.v); });
+  if(!isFinite(wMin)){ wMin=0; wMax=1; }
+  if(wMin===wMax){ wMin-=0.2; wMax+=0.2; }
+  const pad=(wMax-wMin)*0.15; wMin-=pad; wMax+=pad;
+  const Yw=(v)=> padT + plotH - ((v-wMin)/(wMax-wMin))*plotH;
+
+  let g='';
+  // griglia orizzontale + asse conteggi
+  const steps=Math.min(maxCount,4);
+  for(let s=0;s<=steps;s++){ const val=Math.round(maxCount*s/steps); const y=Yc(val);
+    g+='<line x1="'+padL+'" y1="'+y+'" x2="'+(W-padR)+'" y2="'+y+'" stroke="#eef1ee" stroke-width="1"/>';
+    g+='<text x="'+(padL-4)+'" y="'+(y+3)+'" text-anchor="end" font-size="8" fill="#9aa89d">'+val+'</text>';
+  }
+  // etichette date sull'asse x
+  const step=Math.max(1, Math.ceil(n/6));
+  days.forEach((key,i)=>{ if(i%step!==0 && i!==n-1) return;
+    const d=new Date(key.split("-")[0], +key.split("-")[1]-1, +key.split("-")[2]);
+    const lab=d.getDate()+"/"+(d.getMonth()+1);
+    g+='<text x="'+X(i)+'" y="'+(H-10)+'" text-anchor="middle" font-size="8" fill="#9aa89d">'+lab+'</text>';
+  });
+  // asse kg a destra, se il peso è visibile
+  if(chartVisible.weight && wPts.length){
+    for(let s=0;s<=2;s++){ const v=wMin+(wMax-wMin)*s/2; const y=Yw(v);
+      g+='<text x="'+(W-padR+4)+'" y="'+(y+3)+'" text-anchor="start" font-size="8" fill="#4f7ea3">'+fmtKg(Math.round(v*100)/100)+'</text>';
+    }
+  }
+  // linee delle serie
+  CH_SERIES.forEach(sr=>{
+    if(!chartVisible[sr.k]) return;
+    const data=chDataFor(sr.k,days);
+    const pts=[];
+    data.forEach((p,i)=>{ if(p==null) return; const y= sr.axis==="kg"?Yw(p.v):Yc(p.v); pts.push([X(i),y,p.v]); });
+    if(!pts.length) return;
+    if(pts.length>1){
+      g+='<polyline fill="none" stroke="'+sr.col+'" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" points="'
+         + pts.map(p=>p[0].toFixed(1)+","+p[1].toFixed(1)).join(" ")+'"/>';
+    }
+    pts.forEach(p=>{ g+='<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="'+(sr.axis==="kg"?3:2.6)+'" fill="'+sr.col+'"/>'; });
+  });
+  return '<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg">'+g+'</svg>';
+}
+function openChart(){
+  const s=document.getElementById("sheet");
+  const draw=()=>{
+    const nessuno=!Object.keys(chartVisible).some(k=>chartVisible[k]);
+    s.innerHTML =
+      '<h3>Andamento</h3><div class="hint">Tocca le categorie per mostrarle o nasconderle</div>'
+      + '<div class="ch-legend" id="chleg">'
+        + CH_SERIES.map(sr=>'<button class="ch-chip'+(chartVisible[sr.k]?" on":"")+'" data-k="'+sr.k+'" style="'
+            +(chartVisible[sr.k]?"background:"+sr.col+";border-color:"+sr.col+";color:#fff":"color:"+sr.col)+'">'
+            +'<span class="dot"></span>'+sr.nome+'</button>').join("")
+      + '</div>'
+      + '<div class="exp-seg" id="chseg">'
+        + '<button data-p="7" class="'+(chartPeriod==="7"?"on":"")+'">7 g</button>'
+        + '<button data-p="14" class="'+(chartPeriod==="14"?"on":"")+'">14 g</button>'
+        + '<button data-p="30" class="'+(chartPeriod==="30"?"on":"")+'">30 g</button>'
+        + '<button data-p="all" class="'+(chartPeriod==="all"?"on":"")+'">Tutto</button></div>'
+      + (nessuno ? '<div class="ch-empty">Seleziona almeno una categoria qui sopra.</div>'
+                 : '<div class="ch-wrap">'+buildChartSVG()+'</div>')
+      + '<div class="hint" style="margin-top:10px">Poppate, cambi, vomito e cordone: numero al giorno. Peso: kg (scala a destra).</div>'
+      + '<button class="cancel" id="chclose">Chiudi</button>';
+    s.querySelectorAll("#chleg button").forEach(b=> tapSubito(b, ()=>{ chartVisible[b.dataset.k]=!chartVisible[b.dataset.k]; draw(); }));
+    s.querySelectorAll("#chseg button").forEach(b=> b.onclick=()=>{ chartPeriod=b.dataset.p; draw(); });
+    s.querySelector("#chclose").onclick=()=>document.getElementById("scrim").classList.remove("on");
+  };
+  draw();
+  document.getElementById("scrim").classList.add("on");
+}
+
 /* ============ Avvio ============ */
 buildMacro();
 render();
 initSync();
 document.getElementById("expBtn").addEventListener("click", openExport);
+document.getElementById("chartBtn").addEventListener("click", openChart);
 if("serviceWorker" in navigator){ window.addEventListener("load", ()=>navigator.serviceWorker.register("sw.js").catch(()=>{})); }
 </script>
 <script src="/hub/bar.js" defer></script>
