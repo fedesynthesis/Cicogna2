@@ -825,30 +825,44 @@ function buildReport(period){
   L.push("Aggiornato al "+fmtDate(now)+" "+hhmm(now));
   L.push("");
 
-  // --- eventi raggruppati per giorno ---
-  const ev=(state.events||[]).filter(e=>inPeriodo(e.at)).slice().sort((a,b)=>a.at-b.at);
-  const giorni={};
-  ev.forEach(e=>{ (giorni[dayKey(e.at)]=giorni[dayKey(e.at)]||[]).push(e); });
-  const chiavi=Object.keys(giorni).sort().reverse();
-  if(!chiavi.length){ L.push("— Nessun evento nel periodo —"); L.push(""); }
-  chiavi.forEach(k=>{
-    const list=giorni[k];
-    const nf=list.filter(e=>e.type==="feed").length, nd=list.filter(e=>e.type==="diaper").length, nv=list.filter(e=>e.type==="vomit").length;
-    const pl=(n,s,p)=> n+" "+(n===1?s:p);
-    L.push("📅 "+dayLabel(k).toUpperCase()+"  ("+pl(nf,"poppata","poppate")+" · "+pl(nd,"cambio","cambi")+(nv?" · "+pl(nv,"vomito","vomiti"):"")+")");
-    list.forEach(e=>{ L.push("   "+hhmm(e.at)+"  "+eventoTesto(e)); });
+  // --- eventi raggruppati PER CATEGORIA ---
+  const ev=(state.events||[]).filter(e=>inPeriodo(e.at));
+  const quandoLbl=(ms)=>{ const d=new Date(ms); const gg=dayLabel(dayKey(ms));
+    return (gg==="Oggi"||gg==="Ieri"?gg:d.getDate()+"/"+(d.getMonth()+1))+" "+hhmm(ms); };
+  const dettaglio=(e)=>{
+    if(e.type==="feed")  return feedText(e)+(e.mode!=="solido"&&e.note?" · "+e.note:"");
+    if(e.type==="diaper")return (KINDS[e.kind]||KINDS.pipi).t+(e.note?" · "+e.note:"");
+    if(e.type==="vomit") return (e.amount||"")+(e.note?(e.amount?" · ":"")+e.note:"");
+    if(e.type==="cord")  return (CORD_LABEL[e.stato]||e.stato||"medicazione")+(e.note?" · "+e.note:"");
+    return "";
+  };
+  const CAT=[
+    {t:"feed",  titolo:"🍼 POPPATE"},
+    {t:"diaper",titolo:"🧷 CAMBI"},
+    {t:"vomit", titolo:"🤢 VOMITO"},
+    {t:"cord",  titolo:"🩹 CORDONE"}
+  ];
+  let qualcosa=false;
+  CAT.forEach(c=>{
+    const list=ev.filter(e=>e.type===c.t).slice().sort((a,b)=>b.at-a.at);
+    if(!list.length) return;
+    qualcosa=true;
+    L.push(c.titolo+"  ("+list.length+")");
+    list.forEach(e=>{ const d=dettaglio(e); L.push("   "+quandoLbl(e.at)+(d?"  ·  "+d:"")); });
     L.push("");
   });
 
   // --- peso ---
   const w=(state.weights||[]).filter(x=>inPeriodo(x.at)).slice().sort((a,b)=>b.at-a.at);
   if(w.length){
-    L.push("⚖️ PESO");
+    L.push("⚖️ PESO  ("+w.length+")"); qualcosa=true;
     w.forEach((x,i)=>{ const prev=w[i+1];
       const diff=prev ? " ("+(x.kg>=prev.kg?"+":"−")+Math.abs(Math.round((x.kg-prev.kg)*1000))+" g)" : "";
       L.push("   "+fmtDate(x.at)+"  "+fmtKg(x.kg)+" kg"+diff+(x.note?" · "+x.note:"")); });
     L.push("");
   }
+
+  if(!qualcosa){ L.push("— Nessun evento del bebè nel periodo —"); L.push(""); }
 
   // --- da fare ---
   const t=(state.tasks||[]);
