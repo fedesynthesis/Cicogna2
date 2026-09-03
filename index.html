@@ -127,10 +127,19 @@
     padding-top:12px;margin-bottom:-1px;box-shadow:0 -3px 9px rgba(38,52,42,.07)}
   .scheda.on .ti{color:var(--cat)}
   .scheda.on .nm{opacity:1;color:var(--cat)}
+  .reord{display:flex;flex-direction:column;gap:8px;margin:12px 0 4px}
+  .reord-row{display:flex;align-items:center;gap:12px;background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:10px 12px}
+  .re-ic{font-size:22px;width:34px;text-align:center;flex:none}
+  .re-nm{flex:1;min-width:0;font-family:'Quicksand';font-weight:600;font-size:15px}
+  .re-btn{border:1.5px solid var(--line);background:var(--surface);border-radius:10px;width:40px;height:40px;
+    font-size:15px;cursor:pointer;flex:none;color:var(--ink)}
+  .re-btn:disabled{opacity:.3}
+  .re-btn:active:not(:disabled){background:var(--sage-bg)}
   .icgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:6px}
   .icgrid button{aspect-ratio:1;border:1.5px solid var(--line);background:var(--surface);border-radius:12px;
     font-size:19px;cursor:pointer;display:grid;place-items:center}
   .icgrid button.on{border-color:var(--sage);background:var(--sage-bg)}
+  .scheda.dragging{z-index:60;transform:scale(1.08) translateY(-4px);box-shadow:0 8px 18px rgba(38,52,42,.22);opacity:.96}
   .scheda.addtab{background:var(--surface);border:1.5px dashed var(--line);opacity:.9}
   .scheda.addtab .ic{color:var(--sage);font-weight:700}
   .scheda.addtab .ti{color:var(--sage)}
@@ -299,6 +308,7 @@ state.weights= state.weights|| [];      // {id, kg, at, note}
 state.open   = state.open   || {};
 state.openBebe= state.openBebe|| {};
 state.customTabs = state.customTabs || [];  // schede aggiunte da noi: {id,emoji,name,bg,fg,from?}
+state.tabOrder = state.tabOrder || [];  // ordine delle schede (chiavi) scelto da noi
 state.weighDone= state.weighDone|| [];  // chiavi promemoria pesata archiviati
 (function seedVitD(){
   try{ if(localStorage.getItem("nido_seed_vitd")) return; }catch(e){}
@@ -524,6 +534,8 @@ function renderBebe(){
     { k:"weight", emoji:"⚖️", titolo:"Peso",    oggi:null,    righe:w,
       bg:"#e3edf6", fg:"#4f7ea3" }
   ];
+  const _oi = k => { const i=(state.tabOrder||[]).indexOf(k); return i<0?999:i; };
+  SCHEDE.sort((a,b)=> _oi(a.k)-_oi(b.k));   // ordine scelto da noi (le nuove restano in coda)
   const sel = state.bebeTab || null;
 
   let h=remindersHTML()+'<div class="schede">';
@@ -548,6 +560,7 @@ function renderBebe(){
       + (x.k==="weight" ? (w.length? w.length+" pesate · ultima "+fmtDate(w[0].at) : "nessuna pesata")
                         : (x.righe.length? x.righe.length+" in tutto · "+(x.oggi||0)+" oggi" : "ancora niente"))
       + '</div></div>'
+      + '<button class="card-del" id="reordbtn" aria-label="Ordina schede" style="font-size:15px">↕</button>'
       + (x.custom ? '<button class="card-del" data-tabdel="'+x.catId+'" aria-label="Elimina scheda">🗑</button>' : '')
       + '<button class="sez-add" data-new="'+x.k+'" aria-label="Aggiungi">+</button></div>';
 
@@ -592,9 +605,11 @@ function renderBebe(){
     else { if(!state.weighDone.includes(WEIGH_KEY)) state.weighDone.push(WEIGH_KEY); save(); render(); }
   }));
   v.querySelectorAll("[data-tab]").forEach(b=> b.onclick=()=>{
+    if(Date.now()-tabJustDragged<500) return;   // ho appena trascinato: non cambiare scheda
     state.bebeTab = (state.bebeTab===b.dataset.tab) ? null : b.dataset.tab;
     save(); render();
   });
+  enableTabDrag(v.querySelector(".schede"));
   v.querySelectorAll("[data-new]").forEach(b=> b.onclick=(e)=>{
     e.stopPropagation();
     const k=b.dataset.new;
@@ -602,6 +617,7 @@ function renderBebe(){
     else if(k.indexOf("c_")===0) openEvent("custom", null, k.slice(2));
     else openEvent(k);
   });
+  const rob=v.querySelector("#reordbtn"); if(rob) tapSubito(rob, (e)=>{ if(e&&e.stopPropagation) e.stopPropagation(); openReorder(); });
   v.querySelectorAll("[data-tabdel]").forEach(b=> tapSubito(b, (e)=>{ if(e&&e.stopPropagation) e.stopPropagation();
     const catId=b.dataset.tabdel; const t=(state.customTabs||[]).find(x=>x.id===catId);
     askConfirm('Vuoi eliminare la scheda "'+((t&&t.name)||"")+'" e tutti i suoi eventi?', ()=>{
@@ -806,6 +822,101 @@ function openVoce(lid, itemId){
   setTimeout(()=>{ const i=s.querySelector("#vctxt"); if(i) i.focus(); },250);
 }
 
+/* ---- Trascina le schede tenendo premuto 1s (come le icone della Home) ---- */
+let tabJustDragged=0;
+function enableTabDrag(container){
+  if(!container) return;
+  container.querySelectorAll(".scheda[data-tab]").forEach(el=>{
+    el.addEventListener("pointerdown", ev=>{
+      if(ev.pointerType==="mouse" && ev.button!==0) return;
+      const startX=ev.clientX, startY=ev.clientY;
+      let started=false;
+      const timer=setTimeout(()=>{ started=true; startDrag(el); }, 1000);
+      const mv=e=>{ if(!started && (Math.abs(e.clientX-startX)>8 || Math.abs(e.clientY-startY)>8)) cleanup(); };
+      const cleanup=()=>{ clearTimeout(timer); el.removeEventListener("pointermove",mv); el.removeEventListener("pointerup",cleanup); el.removeEventListener("pointercancel",cleanup); };
+      el.addEventListener("pointermove",mv);
+      el.addEventListener("pointerup",cleanup);
+      el.addEventListener("pointercancel",cleanup);
+    });
+  });
+  function startDrag(el){
+    el.classList.add("dragging");
+    if(navigator.vibrate) try{ navigator.vibrate(18); }catch(e){}
+    const prevOverflow=container.style.overflowX; container.style.overflowX="hidden";
+    const tabs=()=>[...container.querySelectorAll(".scheda[data-tab]")];
+    const move=e=>{
+      e.preventDefault();
+      const x=e.clientX;
+      for(const t of tabs()){
+        if(t===el) continue;
+        const r=t.getBoundingClientRect();
+        if(x>r.left && x<r.right){
+          if(x < r.left + r.width/2) container.insertBefore(el, t);
+          else container.insertBefore(el, t.nextSibling);
+          break;
+        }
+      }
+    };
+    const end=()=>{
+      document.removeEventListener("pointermove",move,true);
+      document.removeEventListener("pointerup",end,true);
+      document.removeEventListener("pointercancel",end,true);
+      container.style.overflowX=prevOverflow||"auto";
+      el.classList.remove("dragging");
+      state.tabOrder = tabs().map(t=>t.dataset.tab); save();
+      tabJustDragged=Date.now();
+      render();
+    };
+    document.addEventListener("pointermove",move,true);
+    document.addEventListener("pointerup",end,true);
+    document.addEventListener("pointercancel",end,true);
+  }
+}
+
+/* ---- Riordina le schede ---- */
+const BASE_TABS={feed:["🍼","Poppata"], vomit:["🤢","Vomito"], diaper:["🧷","Cambio"], cord:["🩹","Cordone"], weight:["⚖️","Peso"]};
+function currentTabList(){
+  const today=dayKey(Date.now());
+  let list=[
+    {k:"feed",emoji:"🍼",name:"Poppata"},
+    {k:"vomit",emoji:"🤢",name:"Vomito"},
+    {k:"diaper",emoji:"🧷",name:"Cambio"},
+    {k:"cord",emoji:"🩹",name:"Cordone"}
+  ];
+  (state.customTabs||[]).filter(t=> !t.from || today>=t.from).forEach(t=> list.push({k:"c_"+t.id, emoji:t.emoji||"⭐", name:t.name||"Scheda"}));
+  list.push({k:"weight",emoji:"⚖️",name:"Peso"});
+  const oi=k=>{ const i=(state.tabOrder||[]).indexOf(k); return i<0?999:i; };
+  list.sort((a,b)=> oi(a.k)-oi(b.k));
+  return list;
+}
+function moveTab(k, dir){
+  const list=currentTabList().map(t=>t.k);
+  const i=list.indexOf(k), j=i+dir;
+  if(i<0 || j<0 || j>=list.length) return;
+  const tmp=list[i]; list[i]=list[j]; list[j]=tmp;
+  state.tabOrder=list; save();
+}
+function openReorder(){
+  const s=document.getElementById("sheet");
+  const draw=()=>{
+    const list=currentTabList();
+    s.innerHTML = '<h3>Ordina le schede</h3><div class="hint">In alto = più a sinistra nella striscia</div>'
+      + '<div class="reord">'
+      + list.map((t,i)=> '<div class="reord-row">'
+          + '<span class="re-ic">'+t.emoji+'</span><span class="re-nm">'+esc(t.name)+'</span>'
+          + '<button class="re-btn" data-up="'+t.k+'"'+(i===0?" disabled":"")+'>▲</button>'
+          + '<button class="re-btn" data-dn="'+t.k+'"'+(i===list.length-1?" disabled":"")+'>▼</button>'
+          + '</div>').join("")
+      + '</div>'
+      + '<button class="go" id="reok">Fatto</button>';
+    s.querySelectorAll("[data-up]").forEach(b=> tapSubito(b, (e)=>{ if(e&&e.stopPropagation)e.stopPropagation(); moveTab(b.dataset.up,-1); draw(); }));
+    s.querySelectorAll("[data-dn]").forEach(b=> tapSubito(b, (e)=>{ if(e&&e.stopPropagation)e.stopPropagation(); moveTab(b.dataset.dn,+1); draw(); }));
+    s.querySelector("#reok").onclick=()=>{ document.getElementById("scrim").classList.remove("on"); render(); };
+  };
+  draw();
+  document.getElementById("scrim").classList.add("on");
+}
+
 /* ---- Nuova scheda personalizzata (categoria bebè) ---- */
 const TAB_COLORS=[["#e4f2e8","#3f8a58"],["#fbf1d8","#9a7b16"],["#f7e9dd","#a2703f"],["#e3edf6","#4f7ea3"],["#f3e8f2","#a05a86"],["#e6f0ef","#3f8a80"]];
 const TAB_ICONS=["💊","🌡️","🛁","💤","🍼","🧴","💉","🩺","🦷","🧷","💩","💧","🤮","🩹","👶","🚼","🧸","📏","🥄","🍎","☀️","🌙","❤️","⭐","🌿","🧦","👕","🚽"];
@@ -934,7 +1045,7 @@ const FB_CONFIG={
 /* Le regole del progetto autorizzano solo questo documento: ci scriviamo dentro i nostri
    campi SENZA toccare quelli della vecchia lista nascita (vedi merge:true più sotto). */
 const ROOM_COL="LL09Rb8OO0yjHQnJBsPCPSu1", ROOM_DOC="YXZm9MNsAFCNNQiTgQnU7LEg";
-const SYNC_KEYS=["events","tasks","lists","weights","customTabs","weighDone"];
+const SYNC_KEYS=["events","tasks","lists","weights","customTabs","weighDone","tabOrder"];
 const SYNC_INIT="nido_sync_init";
 let FB=null, fdoc=null, fbReady=false, pendingWrite=false, dirty=false, pushTimer=null;
 
@@ -965,6 +1076,7 @@ function mergeUnion(local, server){
   const uniq=(a,b)=>[...new Set([...(a||[]),...(b||[])])];
   out.customTabs = byId(server.customTabs, local.customTabs);
   out.weighDone = uniq(server.weighDone, local.weighDone);
+  out.tabOrder = (server.tabOrder&&server.tabOrder.length)?server.tabOrder:(local.tabOrder||[]);
   const lm={};
   [...(server.lists||[]), ...(local.lists||[])].forEach(l=>{
     if(!l||!l.id) return;
