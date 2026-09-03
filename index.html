@@ -313,7 +313,7 @@ state.weighDone= state.weighDone|| [];  // chiavi promemoria pesata archiviati
 (function seedVitD(){
   try{ if(localStorage.getItem("nido_seed_vitd")) return; }catch(e){}
   if(!state.customTabs.some(t=>t.id==="vitd"))
-    state.customTabs.push({id:"vitd", emoji:"💊", name:"Vitamina D", bg:"#f3e8f2", fg:"#a05a86", from:"2026-09-08"});
+    state.customTabs.push({id:"vitd", emoji:"💊", name:"Vitamina D", bg:"#ecd7ea", fg:"#a05a86", from:"2026-09-08"});
   try{ localStorage.setItem("nido_seed_vitd","1"); }catch(e){}
 })();
 
@@ -523,16 +523,16 @@ function renderBebe(){
   }));
   const SCHEDE=[
     { k:"feed",   emoji:"🍼", titolo:"Poppata", oggi:nFeed,   righe:ev.filter(e=>e.type==="feed"),
-      bg:"#e4f2e8", fg:"#3f8a58" },
+      bg:"#d2ebd9", fg:"#3f8a58" },
     { k:"vomit",  emoji:"🤢", titolo:"Vomito",  oggi:nVomit,  righe:ev.filter(e=>e.type==="vomit"),
-      bg:"#f7e9dd", fg:"#a2703f" },
+      bg:"#f1dbc6", fg:"#a2703f" },
     { k:"diaper", emoji:"🧷", titolo:"Cambio",  oggi:nDiaper, righe:ev.filter(e=>e.type==="diaper"),
-      bg:"#fbf1d8", fg:"#9a7b16" },
+      bg:"#f6e6bb", fg:"#9a7b16" },
     { k:"cord",   emoji:"🩹", titolo:"Cordone", oggi:nCord,   righe:ev.filter(e=>e.type==="cord"),
-      bg:"#ece7f5", fg:"#6f5b9b" },
+      bg:"#ddd3ef", fg:"#6f5b9b" },
     ...custom,
     { k:"weight", emoji:"⚖️", titolo:"Peso",    oggi:null,    righe:w,
-      bg:"#e3edf6", fg:"#4f7ea3" }
+      bg:"#d3e3f1", fg:"#4f7ea3" }
   ];
   const _oi = k => { const i=(state.tabOrder||[]).indexOf(k); return i<0?999:i; };
   SCHEDE.sort((a,b)=> _oi(a.k)-_oi(b.k));   // ordine scelto da noi (le nuove restano in coda)
@@ -918,7 +918,7 @@ function openReorder(){
 }
 
 /* ---- Nuova scheda personalizzata (categoria bebè) ---- */
-const TAB_COLORS=[["#e4f2e8","#3f8a58"],["#fbf1d8","#9a7b16"],["#f7e9dd","#a2703f"],["#e3edf6","#4f7ea3"],["#f3e8f2","#a05a86"],["#e6f0ef","#3f8a80"]];
+const TAB_COLORS=[["#d2ebd9","#3f8a58"],["#f6e6bb","#9a7b16"],["#f1dbc6","#a2703f"],["#d3e3f1","#4f7ea3"],["#ecd7ea","#a05a86"],["#d4e8e4","#3f8a80"]];
 const TAB_ICONS=["💊","🌡️","🛁","💤","🍼","🧴","💉","🩺","🦷","🧷","💩","💧","🤮","🩹","👶","🚼","🧸","📏","🥄","🍎","☀️","🌙","❤️","⭐","🌿","🧦","👕","🚽"];
 let newTabColor=0, newTabEmoji="💊";
 function openNewTab(){
