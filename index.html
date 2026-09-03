@@ -512,12 +512,12 @@ function renderBebe(){
     e.stopPropagation();
     if(b.dataset.new==="weight") openWeight(); else openEvent(b.dataset.new);
   });
-  v.querySelectorAll("[data-del]").forEach(b=> b.onclick=(e)=>{ e.stopPropagation(); const id=b.dataset.del; askConfirm("Vuoi eliminare questa voce?", ()=>delEvent(id)); });
-  v.querySelectorAll("[data-edit]").forEach(el=> tapSubito(el, ()=>{ const ev=state.events.find(x=>x.id===el.dataset.edit); if(ev) openEvent(ev.type, ev.id); }));
-  v.querySelectorAll("[data-wedit]").forEach(el=> tapSubito(el, ()=> openWeight(el.dataset.wedit)));
-  v.querySelectorAll("[data-wdel]").forEach(b=> b.onclick=(e)=>{ e.stopPropagation(); const id=b.dataset.wdel;
+  v.querySelectorAll("[data-del]").forEach(b=> tapSubito(b, (e)=>{ if(e&&e.stopPropagation) e.stopPropagation(); const id=b.dataset.del; askConfirm("Vuoi eliminare questa voce?", ()=>delEvent(id)); }));
+  v.querySelectorAll("[data-edit]").forEach(el=> tapSubito(el, (e)=>{ if(e&&e.target&&e.target.closest(".del")) return; const ev=state.events.find(x=>x.id===el.dataset.edit); if(ev) openEvent(ev.type, ev.id); }));
+  v.querySelectorAll("[data-wedit]").forEach(el=> tapSubito(el, (e)=>{ if(e&&e.target&&e.target.closest(".del")) return; openWeight(el.dataset.wedit); }));
+  v.querySelectorAll("[data-wdel]").forEach(b=> tapSubito(b, (e)=>{ if(e&&e.stopPropagation) e.stopPropagation(); const id=b.dataset.wdel;
     askConfirm("Vuoi eliminare questa pesata?", ()=>{ state.weights=state.weights.filter(z=>z.id!==id); save(); render(); });
-  });
+  }));
 }
 
 /* ---- Peso ---- */
