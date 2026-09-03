@@ -107,8 +107,9 @@
     font-family:'Quicksand';font-weight:700;font-size:13.5px;cursor:pointer}
   .rem-btn.ghost{background:var(--sage-bg);color:var(--sage)}
   .rem-btn:active{transform:scale(.95)}
-  .schede{display:flex;align-items:flex-end;margin:16px 0 0;padding-left:2px}
-  .scheda{flex:1;min-width:0;background:var(--catbg,var(--bg2));border:1px solid rgba(38,52,42,.07);border-bottom:none;
+  .schede{display:flex;align-items:flex-end;margin:16px 0 0;padding:4px 2px 0;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .schede::-webkit-scrollbar{display:none}
+  .scheda{flex:0 0 auto;width:66px;background:var(--catbg,var(--bg2));border:1px solid rgba(38,52,42,.07);border-bottom:none;
     border-radius:12px 12px 0 0;padding:8px 2px 9px 8px;margin-left:-7px;
     display:flex;flex-direction:column;align-items:center;gap:1px;cursor:pointer;
     box-shadow:2px -2px 6px rgba(38,52,42,.06);transition:.16s;position:relative}
@@ -126,6 +127,10 @@
     padding-top:12px;margin-bottom:-1px;box-shadow:0 -3px 9px rgba(38,52,42,.07)}
   .scheda.on .ti{color:var(--cat)}
   .scheda.on .nm{opacity:1;color:var(--cat)}
+  .icgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:6px}
+  .icgrid button{aspect-ratio:1;border:1.5px solid var(--line);background:var(--surface);border-radius:12px;
+    font-size:19px;cursor:pointer;display:grid;place-items:center}
+  .icgrid button.on{border-color:var(--sage);background:var(--sage-bg)}
   .scheda.addtab{background:var(--surface);border:1.5px dashed var(--line);opacity:.9}
   .scheda.addtab .ic{color:var(--sage);font-weight:700}
   .scheda.addtab .ti{color:var(--sage)}
@@ -803,26 +808,30 @@ function openVoce(lid, itemId){
 
 /* ---- Nuova scheda personalizzata (categoria bebè) ---- */
 const TAB_COLORS=[["#e4f2e8","#3f8a58"],["#fbf1d8","#9a7b16"],["#f7e9dd","#a2703f"],["#e3edf6","#4f7ea3"],["#f3e8f2","#a05a86"],["#e6f0ef","#3f8a80"]];
-let newTabColor=0;
+const TAB_ICONS=["💊","🌡️","🛁","💤","🍼","🧴","💉","🩺","🦷","🧷","💩","💧","🤮","🩹","👶","🚼","🧸","📏","🥄","🍎","☀️","🌙","❤️","⭐","🌿","🧦","👕","🚽"];
+let newTabColor=0, newTabEmoji="💊";
 function openNewTab(){
-  newTabColor=0;
+  newTabColor=0; newTabEmoji="💊";
   const s=document.getElementById("sheet");
   s.innerHTML =
     '<h3>Nuova scheda</h3><div class="hint">Una categoria tua (es. Farmaci, Bagnetto, Temperatura)</div>'
     + '<div class="lbl">Nome</div><div class="fld"><input id="ntname" type="text" placeholder="es. Bagnetto"></div>'
-    + '<div class="lbl">Emoji</div><div class="fld"><input id="ntemoji" type="text" placeholder="⭐"></div>'
+    + '<div class="lbl">Icona</div><div class="icgrid" id="ntico">'
+      + TAB_ICONS.map(e=>'<button data-e="'+e+'" class="'+(e===newTabEmoji?"on":"")+'">'+e+'</button>').join("")
+    + '</div>'
     + '<div class="lbl">Colore</div><div class="opts" id="ntcol">'
       + TAB_COLORS.map((c,i)=>'<button data-c="'+i+'" class="'+(i===0?"on":"")+'" style="background:'+c[0]+';border-color:'+(i===0?c[1]:"transparent")+';color:'+c[1]+';font-size:18px">●</button>').join("")
     + '</div>'
     + '<button class="go" id="ntgo">Crea scheda</button>'
     + '<button class="cancel" id="ntcancel">Annulla</button>';
   document.getElementById("scrim").classList.add("on");
+  s.querySelectorAll("#ntico button").forEach(b=> b.onclick=()=>{ newTabEmoji=b.dataset.e;
+    s.querySelectorAll("#ntico button").forEach(x=> x.classList.toggle("on", x.dataset.e===newTabEmoji)); });
   s.querySelectorAll("#ntcol button").forEach(b=> b.onclick=()=>{ newTabColor=+b.dataset.c;
     s.querySelectorAll("#ntcol button").forEach(x=>{ const on=(+x.dataset.c===newTabColor); x.classList.toggle("on",on); x.style.borderColor= on? TAB_COLORS[+x.dataset.c][1] : "transparent"; }); });
   const go=()=>{ const name=(s.querySelector("#ntname").value||"").trim(); if(!name){ toast("Scrivi un nome"); return; }
-    const emoji=(s.querySelector("#ntemoji").value||"").trim()||"⭐";
     const c=TAB_COLORS[newTabColor]||TAB_COLORS[0]; const id=uid();
-    state.customTabs.push({id:id, emoji:emoji, name:name, bg:c[0], fg:c[1]});
+    state.customTabs.push({id:id, emoji:newTabEmoji||"⭐", name:name, bg:c[0], fg:c[1]});
     state.bebeTab="c_"+id; save();
     document.getElementById("scrim").classList.remove("on"); render(); toast("Scheda creata"); };
   tapSubito(s.querySelector("#ntgo"), go);
