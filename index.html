@@ -259,7 +259,7 @@
         </defs>
         <path d="M85 124c-22 0-38-14-38-32 0-11 6-19 15-24 3-11 11-18 23-18s20 7 23 18c9 5 15 13 15 24 0 18-16 32-38 32z" fill="url(#hg)"/>
         <path d="M85 52c-11 0-19 7-22 17-6 4-11 9-13 15 8-9 20-15 35-15s27 6 35 15c-2-6-7-11-13-15-3-10-11-17-22-17z" fill="url(#hgl)"/>
-        <path d="M85 52c1-6 5-10 10-9" stroke="#3f8a58" stroke-width="5" stroke-linecap="round" fill="none"/>
+        <path d="M85 52c1-6 5-10 10-9" stroke="#2f7247" stroke-width="5" stroke-linecap="round" fill="none"/>
         <circle cx="71" cy="85" r="4.6" fill="#26342a"/><circle cx="99" cy="85" r="4.6" fill="#26342a"/>
         <circle cx="72.4" cy="83.4" r="1.5" fill="#fff" opacity=".9"/><circle cx="100.4" cy="83.4" r="1.5" fill="#fff" opacity=".9"/>
         <path d="M77 101c4.5 4.5 11.5 4.5 16 0" stroke="#26342a" stroke-width="4.4" stroke-linecap="round" fill="none"/>
@@ -313,7 +313,7 @@ state.weighDone= state.weighDone|| [];  // chiavi promemoria pesata archiviati
 (function seedVitD(){
   try{ if(localStorage.getItem("nido_seed_vitd")) return; }catch(e){}
   if(!state.customTabs.some(t=>t.id==="vitd"))
-    state.customTabs.push({id:"vitd", emoji:"💊", name:"Vitamina D", bg:"#ecd7ea", fg:"#a05a86", from:"2026-09-08"});
+    state.customTabs.push({id:"vitd", emoji:"💊", name:"Vitamina D", bg:"#ecd7ea", fg:"#874669", from:"2026-09-08"});
   try{ localStorage.setItem("nido_seed_vitd","1"); }catch(e){}
 })();
 
@@ -523,16 +523,16 @@ function renderBebe(){
   }));
   const SCHEDE=[
     { k:"feed",   emoji:"🍼", titolo:"Poppata", oggi:nFeed,   righe:ev.filter(e=>e.type==="feed"),
-      bg:"#d2ebd9", fg:"#3f8a58" },
+      bg:"#d2ebd9", fg:"#2f7247" },
     { k:"vomit",  emoji:"🤢", titolo:"Vomito",  oggi:nVomit,  righe:ev.filter(e=>e.type==="vomit"),
-      bg:"#f1dbc6", fg:"#a2703f" },
+      bg:"#f1dbc6", fg:"#8a5a2c" },
     { k:"diaper", emoji:"🧷", titolo:"Cambio",  oggi:nDiaper, righe:ev.filter(e=>e.type==="diaper"),
-      bg:"#f6e6bb", fg:"#9a7b16" },
+      bg:"#f6e6bb", fg:"#7c6210" },
     { k:"cord",   emoji:"🩹", titolo:"Cordone", oggi:nCord,   righe:ev.filter(e=>e.type==="cord"),
-      bg:"#ddd3ef", fg:"#6f5b9b" },
+      bg:"#ddd3ef", fg:"#574685" },
     ...custom,
     { k:"weight", emoji:"⚖️", titolo:"Peso",    oggi:null,    righe:w,
-      bg:"#d3e3f1", fg:"#4f7ea3" }
+      bg:"#d3e3f1", fg:"#3c6a8e" }
   ];
   const _oi = k => { const i=(state.tabOrder||[]).indexOf(k); return i<0?999:i; };
   SCHEDE.sort((a,b)=> _oi(a.k)-_oi(b.k));   // ordine scelto da noi (le nuove restano in coda)
@@ -918,7 +918,7 @@ function openReorder(){
 }
 
 /* ---- Nuova scheda personalizzata (categoria bebè) ---- */
-const TAB_COLORS=[["#d2ebd9","#3f8a58"],["#f6e6bb","#9a7b16"],["#f1dbc6","#a2703f"],["#d3e3f1","#4f7ea3"],["#ecd7ea","#a05a86"],["#d4e8e4","#3f8a80"]];
+const TAB_COLORS=[["#d2ebd9","#2f7247"],["#f6e6bb","#7c6210"],["#f1dbc6","#8a5a2c"],["#d3e3f1","#3c6a8e"],["#ecd7ea","#874669"],["#d4e8e4","#2f736a"]];
 const TAB_ICONS=["💊","🌡️","🛁","💤","🍼","🧴","💉","🩺","🦷","🧷","💩","💧","🤮","🩹","👶","🚼","🧸","📏","🥄","🍎","☀️","🌙","❤️","⭐","🌿","🧦","👕","🚽"];
 let newTabColor=0, newTabEmoji="💊";
 function openNewTab(){
@@ -1243,11 +1243,11 @@ async function copia(testo){
 
 /* ============ Grafico andamento ============ */
 const CH_SERIES=[
-  {k:"feed",   nome:"Poppate", col:"#3f8a58", axis:"count"},
+  {k:"feed",   nome:"Poppate", col:"#2f7247", axis:"count"},
   {k:"diaper", nome:"Cambi",   col:"#c39a1f", axis:"count"},
-  {k:"vomit",  nome:"Vomito",  col:"#a2703f", axis:"count"},
-  {k:"cord",   nome:"Cordone", col:"#6f5b9b", axis:"count"},
-  {k:"weight", nome:"Peso",    col:"#4f7ea3", axis:"kg"}
+  {k:"vomit",  nome:"Vomito",  col:"#8a5a2c", axis:"count"},
+  {k:"cord",   nome:"Cordone", col:"#574685", axis:"count"},
+  {k:"weight", nome:"Peso",    col:"#3c6a8e", axis:"kg"}
 ];
 let chartVisible={feed:true, diaper:true, vomit:false, cord:false, weight:true};
 let chartPeriod="14";
@@ -1318,7 +1318,7 @@ function buildChartSVG(){
   // asse kg a destra, se il peso è visibile
   if(chartVisible.weight && wPts.length){
     for(let s=0;s<=2;s++){ const v=wMin+(wMax-wMin)*s/2; const y=Yw(v);
-      g+='<text x="'+(W-padR+4)+'" y="'+(y+3)+'" text-anchor="start" font-size="8" fill="#4f7ea3">'+fmtKg(Math.round(v*100)/100)+'</text>';
+      g+='<text x="'+(W-padR+4)+'" y="'+(y+3)+'" text-anchor="start" font-size="8" fill="#3c6a8e">'+fmtKg(Math.round(v*100)/100)+'</text>';
     }
   }
   // linee delle serie
