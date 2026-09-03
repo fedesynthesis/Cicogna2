@@ -512,11 +512,11 @@ function renderBebe(){
     e.stopPropagation();
     if(b.dataset.new==="weight") openWeight(); else openEvent(b.dataset.new);
   });
-  v.querySelectorAll("[data-del]").forEach(b=> b.onclick=(e)=>{ e.stopPropagation(); if(confirm("Eliminare questa voce?")) delEvent(b.dataset.del); });
+  v.querySelectorAll("[data-del]").forEach(b=> b.onclick=(e)=>{ e.stopPropagation(); const id=b.dataset.del; askConfirm("Vuoi eliminare questa voce?", ()=>delEvent(id)); });
   v.querySelectorAll("[data-edit]").forEach(el=> tapSubito(el, ()=>{ const ev=state.events.find(x=>x.id===el.dataset.edit); if(ev) openEvent(ev.type, ev.id); }));
   v.querySelectorAll("[data-wedit]").forEach(el=> tapSubito(el, ()=> openWeight(el.dataset.wedit)));
-  v.querySelectorAll("[data-wdel]").forEach(b=> b.onclick=()=>{
-    if(confirm("Eliminare questa pesata?")){ state.weights=state.weights.filter(z=>z.id!==b.dataset.wdel); save(); render(); }
+  v.querySelectorAll("[data-wdel]").forEach(b=> b.onclick=(e)=>{ e.stopPropagation(); const id=b.dataset.wdel;
+    askConfirm("Vuoi eliminare questa pesata?", ()=>{ state.weights=state.weights.filter(z=>z.id!==id); save(); render(); });
   });
 }
 
@@ -574,7 +574,8 @@ function renderFare(){
 
   tapSubito(v.querySelector("#taddbtn"), ()=>openTask());
   v.querySelectorAll("[data-tg]").forEach(b=> b.onclick=()=>{ const t=state.tasks.find(x=>x.id===b.dataset.tg); if(t){ t.done=!t.done; save(); render(); } });
-  v.querySelectorAll("[data-tdel]").forEach(b=> b.onclick=(e)=>{ e.stopPropagation(); state.tasks=state.tasks.filter(x=>x.id!==b.dataset.tdel); save(); render(); });
+  v.querySelectorAll("[data-tdel]").forEach(b=> b.onclick=(e)=>{ e.stopPropagation(); const id=b.dataset.tdel;
+    askConfirm("Vuoi eliminare questo compito?", ()=>{ state.tasks=state.tasks.filter(x=>x.id!==id); save(); render(); }); });
   v.querySelectorAll("[data-tedit]").forEach(el=> tapSubito(el, ()=> openTask(el.dataset.tedit)));
 }
 function taskRow(t){
@@ -622,27 +623,23 @@ function renderListe(){
     const id=el.dataset.open; state.open[id] = state.open[id]===false ? true : false; save(); render();
   });
   v.querySelectorAll("[data-ldel]").forEach(b=> b.onclick=(e)=>{ e.stopPropagation();
-    const l=state.lists.find(x=>x.id===b.dataset.ldel);
-    if(l && confirm('Eliminare la sezione "'+l.name+'" e tutto il suo contenuto?')){
-      state.lists=state.lists.filter(x=>x.id!==b.dataset.ldel); save(); render();
-    }
+    const id=b.dataset.ldel; const l=state.lists.find(x=>x.id===id); if(!l) return;
+    askConfirm('Vuoi eliminare la sezione "'+l.name+'" e tutto il suo contenuto?', ()=>{
+      state.lists=state.lists.filter(x=>x.id!==id); save(); render();
+    });
   });
   v.querySelectorAll("[data-ig]").forEach(b=> b.onclick=()=>{
     const [lid,iid]=b.dataset.ig.split("::"); const l=state.lists.find(x=>x.id===lid);
     const it=l&&l.items.find(x=>x.id===iid); if(it){ it.done=!it.done; save(); render(); }
   });
   v.querySelectorAll("[data-iedit]").forEach(el=> tapSubito(el, ()=>{ const p=el.dataset.iedit.split("::"); openVoce(p[0],p[1]); }));
-  v.querySelectorAll("[data-idel]").forEach(b=> b.onclick=()=>{
+  v.querySelectorAll("[data-idel]").forEach(b=> b.onclick=(e)=>{ e.stopPropagation();
     const [lid,iid]=b.dataset.idel.split("::"); const l=state.lists.find(x=>x.id===lid);
-    if(l){ l.items=l.items.filter(x=>x.id!==iid); save(); render(); }
+    if(l){ askConfirm("Vuoi eliminare questa voce?", ()=>{ l.items=l.items.filter(x=>x.id!==iid); save(); render(); }); }
   });
   v.querySelectorAll("[data-iadd]").forEach(b=> tapSubito(b, (e)=>{ if(e&&e.stopPropagation) e.stopPropagation(); openVoce(b.dataset.iadd); }));
   const ac=v.querySelector("#laddcard");
-  if(ac) ac.onclick=()=>{
-    const name=(prompt("Nome della nuova sezione (es. Pannolini)")||"").trim(); if(!name) return;
-    const emoji=(prompt("Un'emoji (invio per 📦)")||"").trim()||"📦";
-    state.lists.push({id:uid(), emoji:emoji, name:name, items:[]}); save(); render(); toast("Sezione aggiunta");
-  };
+  if(ac) tapSubito(ac, ()=>openNewSection());
 }
 /* Il tasto deve rispondere al primo tocco anche con la tastiera aperta.
    NB: bloccare il pointerdown impedisce del tutto il click su iOS: qui si agisce
@@ -707,6 +704,38 @@ function openVoce(lid, itemId){
   s.querySelector("#vctxt").onkeydown=(e)=>{ if(e.key==="Enter") go(); };
   s.querySelector("#vccancel").onclick=()=>document.getElementById("scrim").classList.remove("on");
   setTimeout(()=>{ const i=s.querySelector("#vctxt"); if(i) i.focus(); },250);
+}
+
+/* ---- Conferma DENTRO l'app (le finestre di sistema non funzionano nelle PWA su iPhone) ---- */
+function askConfirm(msg, onYes, opts){
+  opts=opts||{};
+  const s=document.getElementById("sheet");
+  s.innerHTML =
+    '<h3>'+(opts.title||"Eliminare?")+'</h3>'
+    + '<div class="hint" style="margin:2px 0 22px">'+esc(msg)+'</div>'
+    + '<button class="go" id="cfyes" style="background:'+(opts.danger===false?"var(--sage)":"var(--coral)")+'">'+(opts.yes||"Elimina")+'</button>'
+    + '<button class="cancel" id="cfno">Annulla</button>';
+  document.getElementById("scrim").classList.add("on");
+  tapSubito(s.querySelector("#cfyes"), ()=>{ document.getElementById("scrim").classList.remove("on"); onYes(); });
+  s.querySelector("#cfno").onclick=()=>document.getElementById("scrim").classList.remove("on");
+}
+function openNewSection(){
+  const s=document.getElementById("sheet");
+  s.innerHTML =
+    '<h3>Nuova sezione</h3><div class="hint">Dai un nome e un\'emoji</div>'
+    + '<div class="lbl">Nome</div><div class="fld"><input id="nsname" type="text" placeholder="es. Pannolini"></div>'
+    + '<div class="lbl">Emoji</div><div class="fld"><input id="nsemoji" type="text" placeholder="📦"></div>'
+    + '<button class="go" id="nsgo">Aggiungi</button>'
+    + '<button class="cancel" id="nscancel">Annulla</button>';
+  document.getElementById("scrim").classList.add("on");
+  const go=()=>{ const name=(s.querySelector("#nsname").value||"").trim(); if(!name){ toast("Scrivi un nome"); return; }
+    const emoji=(s.querySelector("#nsemoji").value||"").trim()||"📦";
+    state.lists.push({id:uid(), emoji:emoji, name:name, items:[]}); save();
+    document.getElementById("scrim").classList.remove("on"); render(); toast("Sezione aggiunta"); };
+  tapSubito(s.querySelector("#nsgo"), go);
+  s.querySelector("#nsname").onkeydown=(e)=>{ if(e.key==="Enter") go(); };
+  s.querySelector("#nscancel").onclick=()=>document.getElementById("scrim").classList.remove("on");
+  setTimeout(()=>{ const i=s.querySelector("#nsname"); if(i) i.focus(); },250);
 }
 
 /* ============ Render ============ */
