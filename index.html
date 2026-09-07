@@ -477,12 +477,12 @@ function feedText(e){
 function delEvent(id){ state.events=state.events.filter(e=>e.id!==id); save(); render(); }
 
 /* ============ Promemoria (in-app, condivisi) ============ */
-const VITD_START="2026-09-08", VITD_END="2027-09-08", WEIGH_KEY="2026-09-08";
+const VITD_START="2026-09-08", VITD_END="2027-09-08";
 function remindersHTML(){
   const today=dayKey(Date.now());
   let h='';
   if(today < VITD_START){
-    return '<div class="rem info">🔔 Promemoria impostati · 💊 Vitamina D ogni giorno e ⚖️ pesata, dall\'8 settembre</div>';
+    h += '<div class="rem info">🔔 Vitamina D · promemoria ogni giorno dall\'8 settembre</div>';
   }
   const vitActive = today>=VITD_START && today<=VITD_END;
   if(vitActive){
@@ -494,12 +494,13 @@ function remindersHTML(){
               : '<button class="rem-btn" data-vit="give">Fatto</button>')
       + '</div>';
   }
-  const pesataFatta = (state.weights||[]).some(w=>dayKey(w.at)>=WEIGH_KEY);
-  const weighActive = today>=WEIGH_KEY && !(state.weighDone||[]).includes(WEIGH_KEY) && !pesataFatta;
+  const isSunday = new Date().getDay()===0;               // domenica
+  const pesataOggi = (state.weights||[]).some(w=>dayKey(w.at)===today);
+  const weighActive = isSunday && !(state.weighDone||[]).includes(today) && !pesataOggi;
   if(weighActive){
     h += '<div class="rem">'
       + '<div class="rem-ic">⚖️</div>'
-      + '<div class="rem-tx"><b>Pesata di Gabriele</b><span>promemoria dell\'8 settembre</span></div>'
+      + '<div class="rem-tx"><b>Pesata di Gabri</b><span>promemoria della domenica</span></div>'
       + '<button class="rem-btn" data-weigh="now">Pesa</button>'
       + '<button class="rem-btn ghost" data-weigh="done">Fatto</button>'
       + '</div>';
@@ -604,7 +605,7 @@ function renderBebe(){
   }));
   v.querySelectorAll("[data-weigh]").forEach(b=> tapSubito(b, (e)=>{ if(e&&e.stopPropagation) e.stopPropagation();
     if(b.dataset.weigh==="now"){ openWeight(); }
-    else { if(!state.weighDone.includes(WEIGH_KEY)) state.weighDone.push(WEIGH_KEY); save(); render(); }
+    else { const today=dayKey(Date.now()); if(!state.weighDone.includes(today)) state.weighDone.push(today); save(); render(); }
   }));
   v.querySelectorAll("[data-tab]").forEach(b=> b.onclick=()=>{
     if(Date.now()-tabJustDragged<500) return;   // ho appena trascinato: non cambiare scheda
