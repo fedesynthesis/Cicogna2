@@ -616,7 +616,7 @@ function renderBebe(){
 
   v.querySelectorAll("[data-vit]").forEach(b=> tapSubito(b, (e)=>{ if(e&&e.stopPropagation) e.stopPropagation();
     const today=dayKey(Date.now());
-    if(b.dataset.vit==="give"){ state.events.unshift({id:uid(), type:"custom", catId:"vitd", at:Date.now(), note:"4 gocce"}); state.events.sort((a,b)=>b.at-a.at); toast("Vitamina D segnata ✓"); }
+    if(b.dataset.vit==="give"){ state.events.unshift({id:uid(), type:"custom", catId:"vitd", at:Date.now(), note:"4 gocce"}); state.events.sort((a,b)=>b.at-a.at); state.bebeTab="c_vitd"; toast("Aggiunta al foglio Vitamina D ✓"); }
     else { state.events = state.events.filter(x=> !(x.type==="custom"&&x.catId==="vitd"&&dayKey(x.at)===today)); }
     save(); render();
   }));
