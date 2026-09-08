@@ -335,6 +335,18 @@ state.weighDone= state.weighDone|| [];  // chiavi promemoria pesata archiviati
   state.vitD=[];
   try{ save(); }catch(e){}
 })();
+(function dedupVitD(){
+  // se esiste la scheda ufficiale 'vitd', rimuovo eventuali "Vitamina D" duplicate VUOTE
+  const ct = state.customTabs||[];
+  if(!ct.some(t=>t.id==="vitd")) return;
+  const prima = ct.length;
+  state.customTabs = ct.filter(t=>{
+    if(t.id==="vitd") return true;
+    if(!/vitamin/i.test(t.name||"")) return true;
+    return (state.events||[]).some(e=>e.type==="custom"&&e.catId===t.id);   // tengo solo se ha voci
+  });
+  if(state.customTabs.length!==prima){ if(state.bebeTab && !state.customTabs.some(t=>("c_"+t.id)===state.bebeTab) && state.bebeTab.indexOf("c_")===0) state.bebeTab=null; try{ save(); }catch(e){} }
+})();
 
 let activeMacro = "bebe", editMode = false, taskWho = "tutti";
 
@@ -616,7 +628,10 @@ function renderBebe(){
 
   v.querySelectorAll("[data-vit]").forEach(b=> tapSubito(b, (e)=>{ if(e&&e.stopPropagation) e.stopPropagation();
     const today=dayKey(Date.now());
-    if(b.dataset.vit==="give"){ state.events.unshift({id:uid(), type:"custom", catId:"vitd", at:Date.now(), note:"4 gocce"}); state.events.sort((a,b)=>b.at-a.at); state.bebeTab="c_vitd"; toast("Aggiunta al foglio Vitamina D ✓"); }
+    if(b.dataset.vit==="give"){
+      if(!state.customTabs.some(t=>t.id==="vitd")) state.customTabs.push({id:"vitd", emoji:"💊", name:"Vitamina D", bg:"#ecd7ea", fg:"#874669", from:"2026-09-08"});
+      state.events.unshift({id:uid(), type:"custom", catId:"vitd", at:Date.now(), note:"4 gocce"}); state.events.sort((a,b)=>b.at-a.at); state.bebeTab="c_vitd"; toast("Aggiunta al foglio Vitamina D ✓");
+    }
     else { state.events = state.events.filter(x=> !(x.type==="custom"&&x.catId==="vitd"&&dayKey(x.at)===today)); }
     save(); render();
   }));
