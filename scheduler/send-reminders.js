@@ -65,7 +65,14 @@ async function sendAll(tokens, title, body) {
   const events = Array.isArray(d.events) ? d.events : [];
   const weights = Array.isArray(d.weights) ? d.weights : [];
   const weighDone = Array.isArray(d.weighDone) ? d.weighDone : [];
-  const meta = d.nidoPush || {};   // { vitdLast, weighLast }
+  const meta = d.nidoPush || {};   // { vitdLast, weighLast, testDone }
+
+  // TEST una tantum: alla prima registrazione di un telefono, mando una conferma
+  if (!meta.testDone) {
+    await sendAll(tokens, '🍼 Nido', 'Le notifiche funzionano! ✓');
+    await ref.set({ nidoPush: { testDone: true } }, { merge: true });
+    console.log('Test push inviato.');
+  }
 
   // 1) VITAMINA D — ogni mattina dalle 10:00, se non ancora segnata oggi
   if (now.date >= VITD_START && now.hour >= HOUR && meta.vitdLast !== now.date) {
