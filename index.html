@@ -318,6 +318,22 @@ state.weighDone= state.weighDone|| [];  // chiavi promemoria pesata archiviati
     state.customTabs.push({id:"vitd", emoji:"💊", name:"Vitamina D", bg:"#ecd7ea", fg:"#874669", from:"2026-09-08"});
   try{ localStorage.setItem("nido_seed_vitd","1"); }catch(e){}
 })();
+(function migraVitDVecchie(){
+  // le spunte fatte con la versione precedente stavano in state.vitD (solo date):
+  // le trasformo in voci del foglio Vitamina D (ore 09:00), così non si perdono.
+  if(!Array.isArray(state.vitD) || !state.vitD.length) return;
+  state.events = state.events || [];
+  state.vitD.forEach(d=>{
+    if(typeof d!=="string") return;
+    const giac = state.events.some(e=>e.type==="custom"&&e.catId==="vitd"&&dayKey(e.at)===d);
+    if(giac) return;
+    const at = new Date(d+"T09:00").getTime();
+    if(!isNaN(at)) state.events.push({id:uid(), type:"custom", catId:"vitd", at:at, note:"4 gocce"});
+  });
+  state.events.sort((a,b)=>b.at-a.at);
+  state.vitD=[];
+  try{ save(); }catch(e){}
+})();
 
 let activeMacro = "bebe", editMode = false, taskWho = "tutti";
 
