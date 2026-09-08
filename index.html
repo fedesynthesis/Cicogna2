@@ -273,6 +273,7 @@
       <div class="birth" id="birth">nato il 28/08/2026 · 19:11 · 3,65 kg · 51 cm</div>
       <div class="sub" id="sub">Il diario del bebè</div>
       <div class="sync"><span class="d" id="syncDot"></span><span id="syncTxt">Connessione…</span></div>
+      <div><button class="share-btn" id="notifBtn" hidden style="background:var(--butter);color:#5c4611">🔔 Attiva notifiche</button></div>
       <div class="hdr-actions">
         <button class="share-btn" id="chartBtn">📈 Andamento</button>
         <button class="share-btn" id="expBtn">📤 Esporta</button>
@@ -1407,6 +1408,28 @@ function openChart(){
 /* ============ Avvio ============ */
 /* Notifiche push implicite: chiedo il permesso al PRIMO tocco (iOS pretende un gesto);
    se già concesso, registro/aggiorno il token da solo (all'apertura e in primo piano). */
+function updateNotifBtn(){
+  const b=document.getElementById("notifBtn"); if(!b) return;
+  const attive = !("Notification" in window) || Notification.permission==="granted";
+  b.hidden = attive;
+}
+async function askNotif(){
+  if(!("Notification" in window)){ toast("Le notifiche non sono disponibili qui"); return; }
+  if(Notification.permission==="denied"){
+    askConfirm("Le notifiche sono bloccate per Nido. Aprile da: Impostazioni iPhone → Nido → Notifiche → Consenti notifiche.",
+      ()=>{}, {title:"Notifiche bloccate", yes:"Ho capito", danger:false});
+    return;
+  }
+  let perm=Notification.permission;
+  if(perm==="default") perm=await Notification.requestPermission();
+  if(perm==="granted"){
+    let n=0; const t=async()=>{ if(registerPush){ const r=await registerPush(false); toast(r&&r.ok?"Notifiche attive ✓":"Attivate (registrazione in corso)"); } else if(n++<20){ setTimeout(t,400); } else { toast("Notifiche attive ✓"); } }; t();
+    updateNotifBtn();
+  } else {
+    toast("Permesso non concesso");
+    updateNotifBtn();
+  }
+}
 (function autoNotifNido(){
   if(!("Notification" in window)) return;
   const go=()=>{ let n=0; const t=()=>{ if(registerPush) registerPush(true); else if(n++<40) setTimeout(t,500); }; t(); };
@@ -1414,7 +1437,7 @@ function openChart(){
   else if(Notification.permission==="default"){
     const chiedi=()=>{ document.removeEventListener("pointerdown",chiedi,true); document.removeEventListener("click",chiedi,true);
       let p; try{ p=Notification.requestPermission(); }catch(e){ return; }
-      Promise.resolve(p).then(perm=>{ if(perm==="granted"){ go(); toast("Notifiche attive ✓"); } }); };
+      Promise.resolve(p).then(perm=>{ if(perm==="granted"){ go(); toast("Notifiche attive ✓"); } updateNotifBtn(); }); };
     document.addEventListener("pointerdown",chiedi,true);
     document.addEventListener("click",chiedi,true);
   }
@@ -1425,6 +1448,8 @@ buildMacro();
 render();
 initSync();
 document.getElementById("expBtn").addEventListener("click", openExport);
+document.getElementById("notifBtn").addEventListener("click", askNotif);
+updateNotifBtn();
 document.getElementById("chartBtn").addEventListener("click", openChart);
 if("serviceWorker" in navigator){ window.addEventListener("load", ()=>navigator.serviceWorker.register("sw.js").catch(()=>{})); }
 </script>
