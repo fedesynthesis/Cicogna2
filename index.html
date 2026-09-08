@@ -1065,7 +1065,8 @@ const FB_CONFIG={
 const ROOM_COL="LL09Rb8OO0yjHQnJBsPCPSu1", ROOM_DOC="YXZm9MNsAFCNNQiTgQnU7LEg";
 const SYNC_KEYS=["events","tasks","lists","weights","customTabs","weighDone","tabOrder"];
 const SYNC_INIT="nido_sync_init";
-let FB=null, fdoc=null, fbReady=false, pendingWrite=false, dirty=false, pushTimer=null;
+const VAPID_KEY="BODxg7pjZvTAAfLUJrWec-SyHYxP_HUCanzRWyBybOqDLW2USFYhkAnPh3nXyl-VWRfpExHtgX1BoahF2F_4Mak";  // Web Push cicogna-57ae0
+let FB=null, fdoc=null, fbReady=false, pendingWrite=false, dirty=false, pushTimer=null, registerPush=null;
 
 function setConn(kind,label){
   const d=document.getElementById("syncDot"), t=document.getElementById("syncTxt");
@@ -1115,6 +1116,27 @@ async function initSync(){
     const app = appMod.initializeApp(FB_CONFIG);
     fdoc = FB.doc(FB.getFirestore(app), ROOM_COL, ROOM_DOC);
     fbReady = true;
+    // --- Notifiche push (FCM): registra il token del telefono nel documento condiviso ---
+    try{
+      const M = await import("https://www.gstatic.com/firebasejs/12.17.0/firebase-messaging.js");
+      if(await M.isSupported()){
+        const messaging = M.getMessaging(app);
+        registerPush = async (silent)=>{
+          if(!("Notification" in window)) return {ok:false};
+          let perm = Notification.permission;
+          if(perm!=="granted"){ if(silent) return {ok:false}; perm = await Notification.requestPermission(); if(perm!=="granted") return {ok:false}; }
+          try{
+            const reg = await navigator.serviceWorker.ready;
+            const token = await M.getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
+            if(!token) return {ok:false};
+            const plat = (navigator.standalone || (matchMedia && matchMedia("(display-mode: standalone)").matches)) ? "home" : "browser";
+            await FB.setDoc(fdoc, { pushTokens: { [token]: { ua: navigator.userAgent.slice(0,160), platform:plat, updatedAt: Date.now() } } }, { merge:true });
+            return {ok:true};
+          }catch(e){ console.warn("push token", e); return {ok:false}; }
+        };
+        if("Notification" in window && Notification.permission==="granted") registerPush(true);
+      }
+    }catch(e){ console.warn("messaging non attivo", e); }
     FB.onSnapshot(fdoc, {includeMetadataChanges:true},
       (snap)=>{
         if(snap.metadata.fromCache){ setConn("wait","Offline · solo questo telefono"); return; }
@@ -1383,6 +1405,22 @@ function openChart(){
 }
 
 /* ============ Avvio ============ */
+/* Notifiche push implicite: chiedo il permesso al PRIMO tocco (iOS pretende un gesto);
+   se già concesso, registro/aggiorno il token da solo (all'apertura e in primo piano). */
+(function autoNotifNido(){
+  if(!("Notification" in window)) return;
+  const go=()=>{ let n=0; const t=()=>{ if(registerPush) registerPush(true); else if(n++<40) setTimeout(t,500); }; t(); };
+  if(Notification.permission==="granted"){ go(); }
+  else if(Notification.permission==="default"){
+    const chiedi=()=>{ document.removeEventListener("pointerdown",chiedi,true); document.removeEventListener("click",chiedi,true);
+      let p; try{ p=Notification.requestPermission(); }catch(e){ return; }
+      Promise.resolve(p).then(perm=>{ if(perm==="granted"){ go(); toast("Notifiche attive ✓"); } }); };
+    document.addEventListener("pointerdown",chiedi,true);
+    document.addEventListener("click",chiedi,true);
+  }
+  let last=Date.now();
+  document.addEventListener("visibilitychange",()=>{ if(document.visibilityState!=="visible"||Notification.permission!=="granted")return; if(Date.now()-last<12*3600e3)return; last=Date.now(); if(registerPush) registerPush(true); });
+})();
 buildMacro();
 render();
 initSync();
