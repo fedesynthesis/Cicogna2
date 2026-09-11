@@ -73,9 +73,11 @@
   .docview[hidden]{display:none}
   .dv-bar{padding:calc(env(safe-area-inset-top) + 8px) 12px 8px;background:#fff;box-shadow:var(--shadow-soft);flex:none}
   .dv-close{border:none;background:var(--sage);color:#fff;padding:9px 16px;border-radius:99px;font-family:'Quicksand';font-weight:700;font-size:14px;cursor:pointer}
-  .dv-body{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;overflow:auto;-webkit-overflow-scrolling:touch}
-  .dv-body iframe,.dv-body embed{width:100%;height:100%;border:none;background:#fff}
-  .dv-body img{max-width:100%;max-height:100%;object-fit:contain}
+  .dv-body{flex:1;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;background:#dfe4e0}
+  .dv-center{min-height:100%;display:flex;align-items:center;justify-content:center;padding:10px}
+  .dv-center img{max-width:100%;height:auto}
+  .pdfwrap{padding:10px 8px 20px}
+  .pdfwrap canvas{display:block;width:100%;height:auto;margin:0 auto 10px;background:#fff;box-shadow:0 1px 5px rgba(38,52,42,.18);border-radius:2px}
   .dv-msg{color:var(--ink-soft);padding:34px 24px;text-align:center;font-size:14.5px;line-height:1.5}
   .share-btn.alt{background:var(--surface);color:var(--sage);box-shadow:var(--shadow-soft)}
   /* grafico */
@@ -1524,15 +1526,48 @@ async function onDocPick(e){
   try{ await docSaveFile(f); toast("Documento caricato ✓"); openDocs(); }
   catch(err){ console.warn("doc save", err); toast("Non è stato possibile caricarlo"); }
 }
+let _pdfjsReady=null;
+function loadPdfjs(){
+  if(_pdfjsReady) return _pdfjsReady;
+  _pdfjsReady=new Promise((res,rej)=>{
+    if(window.pdfjsLib){ res(window.pdfjsLib); return; }
+    const sc=document.createElement("script");
+    sc.src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+    sc.onload=()=>{ try{ window.pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"; }catch(e){} res(window.pdfjsLib); };
+    sc.onerror=()=>rej(new Error("pdfjs non caricato"));
+    document.head.appendChild(sc);
+  });
+  return _pdfjsReady;
+}
+async function renderPdf(url, body){
+  body.innerHTML='<div class="dv-msg">Carico il documento…</div>';
+  try{
+    const pdfjs=await loadPdfjs();
+    const doc=await pdfjs.getDocument(url).promise;
+    const wrap=document.createElement("div"); wrap.className="pdfwrap";
+    body.innerHTML=""; body.appendChild(wrap);
+    const width=(body.clientWidth||window.innerWidth)-16;
+    const dpr=Math.min(window.devicePixelRatio||1, 2.5);
+    for(let p=1;p<=doc.numPages;p++){
+      const page=await doc.getPage(p);
+      const v1=page.getViewport({scale:1});
+      const vp=page.getViewport({scale:(width/v1.width)*dpr});
+      const cv=document.createElement("canvas");
+      cv.width=vp.width; cv.height=vp.height;
+      wrap.appendChild(cv);
+      await page.render({canvasContext:cv.getContext("2d"), viewport:vp}).promise;
+    }
+  }catch(e){ console.warn("pdf", e); body.innerHTML='<div class="dv-msg">Non riesco a mostrare questo PDF.<br>Riprova con la connessione attiva.</div>'; }
+}
 async function viewDoc(id){
   let d=null; try{ d=await docGetOne(id); }catch(e){}
   if(!d || !d.blob) return;
   const url=URL.createObjectURL(d.blob), t=d.type||"", body=document.getElementById("dvBody"), dv=document.getElementById("docview");
-  if(t.indexOf("image")===0){ body.innerHTML='<img alt="'+esc(d.name)+'">'; body.querySelector("img").src=url; }
-  else if(t.indexOf("pdf")>-1){ body.innerHTML='<iframe title="'+esc(d.name)+'"></iframe>'; body.querySelector("iframe").src=url; }
-  else { body.innerHTML='<div class="dv-msg">Anteprima non disponibile per questo tipo di file.</div>'; }
   dv._url=url; dv.hidden=false;
   document.getElementById("scrim").classList.remove("on");
+  if(t.indexOf("image")===0){ body.innerHTML='<div class="dv-center"><img alt="'+esc(d.name)+'"></div>'; body.querySelector("img").src=url; }
+  else if(t.indexOf("pdf")>-1){ renderPdf(url, body); }
+  else { body.innerHTML='<div class="dv-msg">Anteprima non disponibile per questo tipo di file.</div>'; }
 }
 function closeDocView(){ const dv=document.getElementById("docview"); dv.hidden=true;
   if(dv._url){ try{ URL.revokeObjectURL(dv._url); }catch(e){} dv._url=null; }
