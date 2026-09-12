@@ -128,19 +128,20 @@
     font-family:'Quicksand';font-weight:700;font-size:13.5px;cursor:pointer}
   .rem-btn.ghost{background:var(--sage-bg);color:var(--sage)}
   .rem-btn:active{transform:scale(.95)}
-  /* schede stile Huckleberry: tessere bianche, icona in un cerchio colorato, 3 per riga */
-  .schede{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:16px 0 0}
-  .scheda{background:#fff;border:2px solid transparent;border-radius:20px;padding:14px 6px 12px;
-    display:flex;flex-direction:column;align-items:center;gap:7px;cursor:pointer;min-width:0;position:relative;
-    box-shadow:0 2px 12px rgba(38,52,42,.08);transition:.16s}
-  .scheda:active{transform:scale(.96)}
-  .scheda .ic{width:48px;height:48px;border-radius:50%;background:var(--catbg,var(--sage-bg));display:grid;place-items:center;font-size:24px;line-height:1}
-  .scheda .ti{font-family:'Quicksand';font-weight:700;font-size:13.5px;color:var(--ink);line-height:1.2;
+  /* schede in GRIGLIA: 3 per riga, più larghe; le nuove vanno in righe da 3 */
+  .schede{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:16px 0 0}
+  .scheda{background:var(--catbg,var(--bg2));border:1.5px solid transparent;border-radius:15px;padding:11px 6px 10px;
+    display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;min-width:0;position:relative;
+    box-shadow:var(--shadow-soft);transition:.16s}
+  .scheda:active{transform:scale(.97)}
+  .scheda .ic{font-size:22px;line-height:1.1}
+  .scheda .ti{font-family:'Quicksand';font-weight:700;font-size:13px;color:var(--cat,var(--ink-soft));line-height:1.2;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-  .scheda .nm{font-size:11px;color:var(--ink-soft);line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-  .scheda.on{border-color:var(--cat)}
+  .scheda .nm{font-size:11px;color:var(--ink-soft);opacity:.8;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .scheda:not(.on){opacity:.85}
+  .scheda.on{border-color:var(--cat);box-shadow:0 3px 11px rgba(38,52,42,.14)}
   .scheda.on .ti{color:var(--cat)}
-  .scheda.addtab .ic{background:var(--sage-bg)}
+  .scheda.on .nm{opacity:1;color:var(--cat)}
   .reord{display:flex;flex-direction:column;gap:8px;margin:12px 0 4px}
   .reord-row{display:flex;align-items:center;gap:12px;background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:10px 12px}
   .re-ic{font-size:22px;width:34px;text-align:center;flex:none}
