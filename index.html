@@ -128,24 +128,18 @@
     font-family:'Quicksand';font-weight:700;font-size:13.5px;cursor:pointer}
   .rem-btn.ghost{background:var(--sage-bg);color:var(--sage)}
   .rem-btn:active{transform:scale(.95)}
-  .schede{display:flex;align-items:flex-end;margin:16px 0 0;padding:4px 2px 0;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none}
-  .schede::-webkit-scrollbar{display:none}
-  .scheda{flex:0 0 auto;width:66px;background:var(--catbg,var(--bg2));border:1px solid rgba(38,52,42,.07);border-bottom:none;
-    border-radius:12px 12px 0 0;padding:8px 2px 9px 8px;margin-left:-7px;
-    display:flex;flex-direction:column;align-items:center;gap:1px;cursor:pointer;
-    box-shadow:2px -2px 6px rgba(38,52,42,.06);transition:.16s;position:relative}
-  .scheda:first-child{margin-left:0;padding-left:4px}
-  .scheda:nth-child(1){z-index:4} .scheda:nth-child(2){z-index:3}
-  .scheda:nth-child(3){z-index:2} .scheda:nth-child(4){z-index:1}
-  .scheda .ic{font-size:17px;line-height:1.15}
-  .scheda .ti{font-family:'Quicksand';font-weight:700;font-size:9.8px;color:var(--ink-soft);line-height:1.2;
+  /* schede in GRIGLIA: 3 per riga, più larghe; le nuove vanno in righe da 3 */
+  .schede{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:16px 0 0}
+  .scheda{background:var(--catbg,var(--bg2));border:1.5px solid transparent;border-radius:15px;padding:11px 6px 10px;
+    display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;min-width:0;position:relative;
+    box-shadow:var(--shadow-soft);transition:.16s}
+  .scheda:active{transform:scale(.97)}
+  .scheda .ic{font-size:22px;line-height:1.1}
+  .scheda .ti{font-family:'Quicksand';font-weight:700;font-size:13px;color:var(--cat,var(--ink-soft));line-height:1.2;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-  .scheda .nm{font-size:8.5px;color:var(--ink-soft);opacity:.75;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-  .scheda .ti{color:var(--cat,var(--ink-soft))}
-  .scheda:not(.on){opacity:.7}
-  /* aperta: stessa tinta dell'etichetta, che prosegue nel foglio sotto */
-  .scheda.on{background:var(--catbg);border-color:var(--cat);z-index:20;
-    padding-top:12px;margin-bottom:-1px;box-shadow:0 -3px 9px rgba(38,52,42,.07)}
+  .scheda .nm{font-size:11px;color:var(--ink-soft);opacity:.8;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .scheda:not(.on){opacity:.85}
+  .scheda.on{border-color:var(--cat);box-shadow:0 3px 11px rgba(38,52,42,.14)}
   .scheda.on .ti{color:var(--cat)}
   .scheda.on .nm{opacity:1;color:var(--cat)}
   .reord{display:flex;flex-direction:column;gap:8px;margin:12px 0 4px}
@@ -164,7 +158,7 @@
   .scheda.addtab{background:var(--surface);border:1.5px dashed var(--line);opacity:.9}
   .scheda.addtab .ic{color:var(--sage);font-weight:700}
   .scheda.addtab .ti{color:var(--sage)}
-  .card.cat{background:var(--catbg)}
+  .card.cat{background:var(--catbg);border-top:2.5px solid var(--cat)}
   .card.cat .card-emoji{background:#fff}
   .card.cat .ev{border-bottom-color:rgba(38,52,42,.08)}
   .card.cat .ev .dot{background:#fff}
@@ -903,11 +897,11 @@ function enableTabDrag(container){
     const tabs=()=>[...container.querySelectorAll(".scheda[data-tab]")];
     const move=e=>{
       e.preventDefault();
-      const x=e.clientX;
+      const x=e.clientX, y=e.clientY;
       for(const t of tabs()){
         if(t===el) continue;
         const r=t.getBoundingClientRect();
-        if(x>r.left && x<r.right){
+        if(x>r.left && x<r.right && y>r.top && y<r.bottom){
           if(x < r.left + r.width/2) container.insertBefore(el, t);
           else container.insertBefore(el, t.nextSibling);
           break;
