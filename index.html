@@ -201,6 +201,17 @@
   .ev .txt span{display:block;font-size:12.5px;color:var(--ink-soft)}
   .ev .time{font-family:'Quicksand';font-weight:600;font-size:14px;color:var(--ink-soft);flex:none}
   .ev .del{border:none;background:none;font-size:16px;padding:4px;cursor:pointer;opacity:.5}
+  /* pesata di DOMENICA: riga evidenziata (checkpoint settimanale) */
+  .ev.sun{background:#fff7e6;box-shadow:inset 4px 0 0 #e0a92e}
+  .card.cat .ev.sun .dot{background:#e0a92e;color:#fff}
+  .ev.sun .txt b{color:#8a6410}
+  .wk{flex:none;font-family:'Quicksand';font-weight:800;font-size:15px;text-align:center;line-height:1.02;
+    padding:6px 11px;border-radius:12px;min-width:66px}
+  .wk small{display:block;font-family:'Inter',sans-serif;font-weight:700;font-size:9px;
+    letter-spacing:.4px;text-transform:uppercase;opacity:.85;margin-top:2px}
+  .wk.up{background:#e3f3e6;color:#2f7247}
+  .wk.down{background:#fbe4e4;color:#b23b3b}
+  .wk.first{background:var(--sage-bg);color:var(--ink-soft);font-weight:700;font-size:14px}
   .tocca{cursor:pointer}
   .ev.tocca:active{background:rgba(0,0,0,.03)}
   .row .t.tocca:active{opacity:.6}
@@ -622,9 +633,22 @@ function renderBebe(){
       x.righe.slice(0,40).forEach((it,i)=>{
         const prev=x.righe[i+1];
         const diff=prev ? (it.kg>=prev.kg?"+":"−")+Math.abs(Math.round((it.kg-prev.kg)*1000))+" g" : "prima pesata";
-        h += '<div class="ev tocca" data-wedit="'+it.id+'"><div class="dot">⚖️</div>'
-          + '<div class="txt"><b>'+fmtKg(it.kg)+' kg</b><span>'+fmtDate(it.at)+(it.note?" · "+esc(it.note):"")+'</span></div>'
-          + '<div class="time">'+diff+'</div>'
+        const isSun = new Date(it.at).getDay()===0;   // domenica = 0
+        let right;
+        if(isSun){
+          // incremento rispetto alla DOMENICA precedente (salta le pesate infrasettimanali)
+          const dk=dayKey(it.at); let ps=null;
+          for(let j=i+1;j<x.righe.length;j++){ const r=x.righe[j];
+            if(new Date(r.at).getDay()===0 && dayKey(r.at)!==dk){ ps=r; break; } }
+          if(ps){ const g=Math.round((it.kg-ps.kg)*1000);
+            right='<div class="wk '+(g>=0?'up':'down')+'">'+(g>=0?'+':'−')+Math.abs(g)+' g<small>settimana</small></div>';
+          } else { right='<div class="wk first">1ª<small>domenica</small></div>'; }
+        } else {
+          right='<div class="time">'+diff+'</div>';
+        }
+        h += '<div class="ev tocca'+(isSun?' sun':'')+'" data-wedit="'+it.id+'"><div class="dot">'+(isSun?'🗓️':'⚖️')+'</div>'
+          + '<div class="txt"><b>'+fmtKg(it.kg)+' kg</b><span>'+(isSun?'Domenica · ':'')+fmtDate(it.at)+(it.note?" · "+esc(it.note):"")+'</span></div>'
+          + right
           + '<button class="del" data-wdel="'+it.id+'">🗑</button></div>';
       });
     } else {
