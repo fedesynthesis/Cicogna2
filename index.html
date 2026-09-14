@@ -37,6 +37,7 @@
   .age{font-family:'Quicksand';font-weight:600;font-size:12.5px;color:var(--ink-soft);margin-top:0}
   .birth{color:var(--ink-soft);font-size:11.5px;margin-top:5px;line-height:1.35;opacity:.85}
   .sub{color:var(--ink-soft);font-size:12.5px;margin-top:4px;opacity:.85}
+  .appver{color:var(--ink-soft);font-size:10px;opacity:.5;margin-top:3px;letter-spacing:.5px}
   .sync{display:inline-flex;align-items:center;gap:6px;background:var(--surface);border-radius:99px;
     padding:4px 10px;font-size:11px;color:var(--ink-soft);box-shadow:var(--shadow-soft);
     position:absolute;left:8px;top:calc(env(safe-area-inset-top) + 8px);margin-top:0;z-index:3;max-width:44vw}
@@ -301,6 +302,7 @@
       <div class="age" id="age"></div>
       <div class="birth" id="birth">nato il 28/08/2026 · 19:11 · 3,65 kg · 51 cm</div>
       <div class="sub" id="sub">Il diario del bebè</div>
+      <div class="appver" id="appver"></div>
       <div class="sync"><span class="d" id="syncDot"></span><span id="syncTxt">Connessione…</span></div>
       <div><button class="share-btn" id="notifBtn" hidden style="background:var(--butter);color:#5c4611">🔔 Attiva notifiche</button></div>
       <div class="hdr-actions">
@@ -312,7 +314,7 @@
     <div class="macro" id="macro"></div>
     <div id="view"></div>
 
-    <p class="note">Diario condiviso · si sincronizza tra i telefoni 🌿<span id="appver" style="opacity:.6"></span></p>
+    <p class="note">Diario condiviso · si sincronizza tra i telefoni 🌿</p>
   </div>
 
   <div class="scrim" id="scrim"><div class="sheet" id="sheet"></div></div>
@@ -1704,7 +1706,7 @@ document.getElementById("chartBtn").addEventListener("click", openChart);
 if("serviceWorker" in navigator){ window.addEventListener("load", ()=>navigator.serviceWorker.register("sw.js").catch(()=>{})); }
 // versione visibile in fondo: la leggo dal nome cache attivo del SW (automatico ad ogni bump)
 (function(){ const el=document.getElementById("appver"); if(!el||!("caches" in window)) return;
-  const show=()=>caches.keys().then(ks=>{ const v=(ks.find(k=>/^nido-c2-/.test(k))||"").replace("nido-c2-",""); if(v) el.textContent=" · "+v; });
+  const show=()=>caches.keys().then(ks=>{ const v=(ks.find(k=>/^nido-c2-/.test(k))||"").replace("nido-c2-",""); if(v) el.textContent=v; });
   show(); if(navigator.serviceWorker){ navigator.serviceWorker.addEventListener("controllerchange", show); }
 })();
 </script>
