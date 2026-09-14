@@ -344,6 +344,7 @@ state.openBebe= state.openBebe|| {};
 state.customTabs = state.customTabs || [];  // schede aggiunte da noi: {id,emoji,name,bg,fg,from?}
 state.tabOrder = state.tabOrder || [];  // ordine delle schede (chiavi) scelto da noi
 state.deleted = state.deleted || {};    // tombstone: {id: timestamp} degli elementi cancellati
+state.docs = state.docs || [];          // metadati documenti condivisi: {id,name,type,size,at,sp} (file su Storage)
 state.weighDone= state.weighDone|| [];  // chiavi promemoria pesata archiviati
 (function seedVitD(){
   try{ if(localStorage.getItem("nido_seed_vitd")) return; }catch(e){}
@@ -1126,10 +1127,13 @@ const FB_CONFIG={
 /* Le regole del progetto autorizzano solo questo documento: ci scriviamo dentro i nostri
    campi SENZA toccare quelli della vecchia lista nascita (vedi merge:true più sotto). */
 const ROOM_COL="LL09Rb8OO0yjHQnJBsPCPSu1", ROOM_DOC="YXZm9MNsAFCNNQiTgQnU7LEg";
-const SYNC_KEYS=["events","tasks","lists","weights","customTabs","weighDone","tabOrder","deleted"];
+const SYNC_KEYS=["events","tasks","lists","weights","customTabs","docs","weighDone","tabOrder","deleted"];
 const SYNC_INIT="nido_sync_init";
 const VAPID_KEY="BODxg7pjZvTAAfLUJrWec-SyHYxP_HUCanzRWyBybOqDLW2USFYhkAnPh3nXyl-VWRfpExHtgX1BoahF2F_4Mak";  // Web Push cicogna-57ae0
 let FB=null, fdoc=null, fbReady=false, pendingWrite=false, dirty=false, pushTimer=null, registerPush=null;
+let STO=null, stoRoot=null;   // Firebase Storage (file dei documenti); null finché non attivato in console
+let stoOk = (function(){ try{ const v=localStorage.getItem("nido_sto_ok"); return v===null?null:v==="1"; }catch(e){ return null; } })();  // null=sconosciuto, true/false=esito ultimo upload
+function setStoOk(v){ stoOk=v; try{ localStorage.setItem("nido_sto_ok", v?"1":"0"); }catch(e){} }
 
 function setConn(kind,label){
   const d=document.getElementById("syncDot"), t=document.getElementById("syncTxt");
@@ -1141,7 +1145,7 @@ function syncedSubset(s){ const o={}; SYNC_KEYS.forEach(k=> o[k]= (k==="deleted"
    dall'altro telefono (che altrimenti la ri-aggiungerebbe con la fusione). */
 function tomb(){ state.deleted=state.deleted||{}; for(let i=0;i<arguments.length;i++){ const id=arguments[i]; if(id) state.deleted[id]=Date.now(); } }
 function allIds(s){ const ids=new Set();
-  ["events","tasks","weights","customTabs","lists"].forEach(k=> (s[k]||[]).forEach(x=>{ if(x&&x.id) ids.add(x.id); }));
+  ["events","tasks","weights","customTabs","lists","docs"].forEach(k=> (s[k]||[]).forEach(x=>{ if(x&&x.id) ids.add(x.id); }));
   (s.lists||[]).forEach(l=> (l.items||[]).forEach(i=>{ if(i&&i.id) ids.add(i.id); })); return ids; }
 /* Serve un push? Solo se il mio stato ha id o tombstone che il server non ha
    (mie aggiunte/cancellazioni da propagare). Basato su INSIEMI → niente ping-pong. */
@@ -1185,6 +1189,7 @@ function mergeUnion(local, server){
   out.weights= byId(server.weights,local.weights).sort((a,b)=>b.at-a.at);
   const uniq=(a,b)=>[...new Set([...(a||[]),...(b||[])])];
   out.customTabs = byId(server.customTabs, local.customTabs);
+  out.docs = byId(server.docs, local.docs).sort((a,b)=>b.at-a.at);   // metadati documenti (file su Storage)
   out.weighDone = uniq(server.weighDone, local.weighDone);
   out.tabOrder = (server.tabOrder&&server.tabOrder.length)?server.tabOrder:(local.tabOrder||[]);
   const lm={};
@@ -1207,6 +1212,9 @@ async function initSync(){
     const app = appMod.initializeApp(FB_CONFIG);
     fdoc = FB.doc(FB.getFirestore(app), ROOM_COL, ROOM_DOC);
     fbReady = true;
+    // --- Storage per i documenti (attivo solo se abilitato in console: se non c'è, resta tutto locale) ---
+    try{ STO = await import("https://www.gstatic.com/firebasejs/12.17.0/firebase-storage.js"); stoRoot = STO.getStorage(app); }
+    catch(e){ STO=null; stoRoot=null; console.warn("Storage non disponibile", e); }
     // --- Notifiche push (FCM): registra il token del telefono nel documento condiviso ---
     try{
       const M = await import("https://www.gstatic.com/firebasejs/12.17.0/firebase-messaging.js");
@@ -1551,9 +1559,18 @@ function docDB(){ return new Promise((res,rej)=>{ if(_docDB) return res(_docDB);
   r.onupgradeneeded=()=>{ if(!r.result.objectStoreNames.contains("files")) r.result.createObjectStore("files",{keyPath:"id"}); };
   r.onsuccess=()=>{ _docDB=r.result; res(_docDB); }; r.onerror=()=>rej(r.error); }); }
 function docStore(mode){ return docDB().then(db=>db.transaction("files",mode).objectStore("files")); }
-function docSaveFile(file){ return docStore("readwrite").then(st=>new Promise((res,rej)=>{
-  const rec={id:uid(), name:file.name||"documento", type:file.type||"", size:file.size||0, at:Date.now(), blob:file};
-  const rq=st.add(rec); rq.onsuccess=()=>res(rec.id); rq.onerror=()=>rej(rq.error); })); }
+function docSaveLocal(id, file){ return docStore("readwrite").then(st=>new Promise((res,rej)=>{
+  const rec={id:id, name:file.name||"documento", type:file.type||"", size:file.size||0, at:Date.now(), blob:file};
+  const rq=st.put(rec); rq.onsuccess=()=>res(id); rq.onerror=()=>rej(rq.error); })); }
+/* --- Storage: file condivisi tra telefoni (attivo solo se Storage è abilitato in console) --- */
+async function docUpload(id, file){ if(!stoRoot||!STO) return null;
+  const r=STO.ref(stoRoot,"nido-docs/"+id);
+  await STO.uploadBytes(r, file, {contentType:file.type||"application/octet-stream"});
+  return "nido-docs/"+id; }
+async function docDownload(sp){ if(!stoRoot||!STO||!sp) return null;
+  return await STO.getBlob(STO.ref(stoRoot,sp)); }
+async function docRemoveRemote(sp){ if(!stoRoot||!STO||!sp) return;
+  try{ await STO.deleteObject(STO.ref(stoRoot,sp)); }catch(e){} }
 function docListAll(){ return docStore("readonly").then(st=>new Promise((res,rej)=>{
   const rq=st.getAll(); rq.onsuccess=()=>res((rq.result||[]).sort((a,b)=>b.at-a.at)); rq.onerror=()=>rej(rq.error); })); }
 function docGetOne(id){ return docStore("readonly").then(st=>new Promise((res,rej)=>{
@@ -1563,12 +1580,22 @@ function docDelOne(id){ return docStore("readwrite").then(st=>new Promise((res,r
 function fmtBytes(n){ n=Number(n)||0; if(n<1024) return n+" B"; if(n<1048576) return Math.round(n/1024)+" KB"; return (n/1048576).toFixed(1)+" MB"; }
 function docIcon(type){ type=type||""; if(type.indexOf("pdf")>-1) return "📄"; if(type.indexOf("image")===0) return "🖼️"; return "📎"; }
 
+async function docMergedList(){
+  let local=[]; try{ local=await docListAll(); }catch(e){}
+  const localIds=new Set(local.map(d=>d.id));
+  const rows=local.map(d=>({id:d.id,name:d.name,type:d.type,size:d.size,at:d.at,remote:false}));
+  (state.docs||[]).forEach(d=>{ if(!localIds.has(d.id)) rows.push({id:d.id,name:d.name,type:d.type,size:d.size,at:d.at,remote:true,sp:d.sp}); });
+  return rows.sort((a,b)=>b.at-a.at);
+}
 async function openDocs(){
   const s=document.getElementById("sheet");
-  let list=[]; try{ list=await docListAll(); }catch(e){}
-  s.innerHTML='<h3>Documenti</h3><div class="hint">Documenti importanti, sul telefono (es. orari del pediatra)</div>'
+  const list=await docMergedList();
+  const hint = stoOk===true ? "Documenti condivisi tra i telefoni ✓ (es. orari del pediatra)"
+             : stoOk===false ? "Solo su questo telefono. Per condividerli, attiva Storage in Firebase."
+             : "Documenti importanti del bebè (es. orari del pediatra).";
+  s.innerHTML='<h3>Documenti</h3><div class="hint">'+hint+'</div>'
     + (list.length ? list.map(d=>'<div class="doc-row" data-doc="'+d.id+'"><div class="di">'+docIcon(d.type)+'</div>'
-        +'<div class="dn"><b>'+esc(d.name)+'</b><span>'+fmtBytes(d.size)+'</span></div>'
+        +'<div class="dn"><b>'+esc(d.name)+'</b><span>'+fmtBytes(d.size)+(d.remote?' · ☁️ da scaricare':'')+'</span></div>'
         +'<button class="dd" data-docdel="'+d.id+'">🗑</button></div>').join("")
       : '<div class="empty" style="padding:22px"><span class="e">📂</span>Ancora nessun documento.<br>Tocca qui sotto per caricarne uno.</div>')
     + '<button class="doc-add" id="docAddBtn">＋ Carica un documento</button>'
@@ -1577,14 +1604,30 @@ async function openDocs(){
   s.querySelector("#docAddBtn").onclick=()=>document.getElementById("docInput").click();
   s.querySelectorAll("[data-doc]").forEach(el=> el.onclick=(e)=>{ if(e.target.closest("[data-docdel]")) return; viewDoc(el.dataset.doc); });
   s.querySelectorAll("[data-docdel]").forEach(b=> b.onclick=(e)=>{ e.stopPropagation(); const id=b.dataset.docdel;
-    askConfirm("Vuoi eliminare questo documento?", async ()=>{ try{ await docDelOne(id); }catch(e){} openDocs(); }); });
+    askConfirm("Vuoi eliminare questo documento?", ()=>docDelete(id)); });
   s.querySelector("#docClose").onclick=()=>document.getElementById("scrim").classList.remove("on");
+}
+async function docDelete(id){
+  tomb(id);
+  const meta=(state.docs||[]).find(d=>d.id===id);
+  state.docs=(state.docs||[]).filter(d=>d.id!==id);
+  try{ await docDelOne(id); }catch(e){}
+  if(meta&&meta.sp) docRemoveRemote(meta.sp);
+  save(); openDocs();
 }
 async function onDocPick(e){
   const f=e.target.files && e.target.files[0]; e.target.value="";
   if(!f) return;
-  try{ await docSaveFile(f); toast("Documento caricato ✓"); openDocs(); }
-  catch(err){ console.warn("doc save", err); toast("Non è stato possibile caricarlo"); }
+  const id=uid();
+  try{
+    await docSaveLocal(id, f);                 // cache locale (apertura veloce/offline)
+    let sp=null;
+    if(stoRoot){ try{ sp=await docUpload(id, f); setStoOk(true); }catch(err){ console.warn("upload doc", err); setStoOk(false); } }
+    if(sp){ state.docs=state.docs||[]; state.docs.unshift({id, name:f.name||"documento", type:f.type||"", size:f.size||0, at:Date.now(), sp}); save();
+            toast("Documento caricato e condiviso ✓"); }
+    else { toast(stoOk===false ? "Caricato solo su questo telefono (Storage non attivo)" : "Caricato (solo su questo telefono)"); }
+    openDocs();
+  }catch(err){ console.warn("doc save", err); toast("Non è stato possibile caricarlo"); }
 }
 let _pdfjsReady=null;
 function loadPdfjs(){
@@ -1621,11 +1664,23 @@ async function renderPdf(url, body){
 }
 async function viewDoc(id){
   let d=null; try{ d=await docGetOne(id); }catch(e){}
-  if(!d || !d.blob) return;
-  const url=URL.createObjectURL(d.blob), t=d.type||"", body=document.getElementById("dvBody"), dv=document.getElementById("docview");
+  let blob = d&&d.blob ? d.blob : null, type = d?d.type:"", name = d?d.name:"documento";
+  const body=document.getElementById("dvBody"), dv=document.getElementById("docview");
+  if(!blob){
+    // non in cache locale: lo scarico da Storage con i metadati condivisi
+    const meta=(state.docs||[]).find(x=>x.id===id);
+    if(!meta||!meta.sp){ toast("Documento non disponibile su questo telefono"); return; }
+    type=meta.type; name=meta.name;
+    dv.hidden=false; document.getElementById("scrim").classList.remove("on");
+    body.innerHTML='<div class="dv-msg">Scarico il documento…</div>';
+    try{ blob=await docDownload(meta.sp); }catch(err){ console.warn("download doc", err); }
+    if(!blob){ body.innerHTML='<div class="dv-msg">Non riesco a scaricare il documento.<br>Riprova con la connessione attiva.</div>'; return; }
+    try{ await docSaveLocal(id, new File([blob], name, {type})); }catch(e){}   // metto in cache per le prossime volte
+  }
+  const url=URL.createObjectURL(blob), t=type||"";
   dv._url=url; dv.hidden=false;
   document.getElementById("scrim").classList.remove("on");
-  if(t.indexOf("image")===0){ body.innerHTML='<div class="dv-center"><img alt="'+esc(d.name)+'"></div>'; body.querySelector("img").src=url; }
+  if(t.indexOf("image")===0){ body.innerHTML='<div class="dv-center"><img alt="'+esc(name)+'"></div>'; body.querySelector("img").src=url; }
   else if(t.indexOf("pdf")>-1){ renderPdf(url, body); }
   else { body.innerHTML='<div class="dv-msg">Anteprima non disponibile per questo tipo di file.</div>'; }
 }
