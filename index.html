@@ -312,7 +312,7 @@
     <div class="macro" id="macro"></div>
     <div id="view"></div>
 
-    <p class="note">Diario condiviso · si sincronizza tra i telefoni 🌿</p>
+    <p class="note">Diario condiviso · si sincronizza tra i telefoni 🌿<span id="appver" style="opacity:.6"></span></p>
   </div>
 
   <div class="scrim" id="scrim"><div class="sheet" id="sheet"></div></div>
@@ -1203,10 +1203,18 @@ async function initSync(){
         setConn("on","Sincronizzato ✓");
         if(pendingWrite || dirty) return;
         const data = snap.exists() ? snap.data() : null;
-        const first = !localStorage.getItem(SYNC_INIT);
         if(!data){ cloudPush(); }
-        else if(first){ const m=mergeUnion(state,data); SYNC_KEYS.forEach(k=> state[k]=m[k]); save(); }
-        else { SYNC_KEYS.forEach(k=>{ if(data[k]!=null) state[k]=data[k]; }); try{ localStorage.setItem(KEY,JSON.stringify(state)); }catch(e){} }
+        else {
+          // FONDO SEMPRE locale + server (union per id): uno snapshot vecchio (rete
+          // ballerina o altro telefono con stato datato) non può più cancellare ciò
+          // che ho appena scritto. Se il locale aveva roba non ancora sul server,
+          // ripubblico (auto-guarigione) — solo quando serve, per non ciclare.
+          const m = mergeUnion(state, data);
+          const grew = SYNC_KEYS.some(k=> Array.isArray(m[k]) && m[k].length > ((data[k]||[]).length));
+          SYNC_KEYS.forEach(k=> state[k]=m[k]);
+          try{ localStorage.setItem(KEY,JSON.stringify(state)); }catch(e){}
+          if(grew) cloudPush();
+        }
         localStorage.setItem(SYNC_INIT,"1");
         conservaCampi(render);   // non cancellare quello che si sta scrivendo
       },
@@ -1602,6 +1610,11 @@ document.getElementById("notifBtn").addEventListener("click", askNotif);
 updateNotifBtn();
 document.getElementById("chartBtn").addEventListener("click", openChart);
 if("serviceWorker" in navigator){ window.addEventListener("load", ()=>navigator.serviceWorker.register("sw.js").catch(()=>{})); }
+// versione visibile in fondo: la leggo dal nome cache attivo del SW (automatico ad ogni bump)
+(function(){ const el=document.getElementById("appver"); if(!el||!("caches" in window)) return;
+  const show=()=>caches.keys().then(ks=>{ const v=(ks.find(k=>/^nido-c2-/.test(k))||"").replace("nido-c2-",""); if(v) el.textContent=" · "+v; });
+  show(); if(navigator.serviceWorker){ navigator.serviceWorker.addEventListener("controllerchange", show); }
+})();
 </script>
 </body>
 </html>
