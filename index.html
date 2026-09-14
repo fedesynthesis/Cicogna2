@@ -1137,7 +1137,7 @@ function syncedSubset(s){ const o={}; SYNC_KEYS.forEach(k=> o[k]= s[k]!=null ? s
 function scheduleCloudPush(){
   if(!fbReady) return;
   dirty=true; clearTimeout(pushTimer);
-  pushTimer=setTimeout(cloudPush, 700);
+  pushTimer=setTimeout(cloudPush, 300);          // pubblico presto: così la scrittura è già partita quando chiudo l'app
 }
 async function cloudPush(){
   if(!fbReady) return;
@@ -1145,7 +1145,14 @@ async function cloudPush(){
   try{ await FB.setDoc(fdoc, syncedSubset(state), {merge:true}); dirty=false; }   // merge: non cancella i dati della lista nascita
   catch(e){ console.warn("push", e); }
   pendingWrite=false;
+  if(dirty) scheduleCloudPush();                 // sono arrivate altre modifiche mentre scrivevo → ripubblico
 }
+/* Flush immediato quando l'app va in background o viene chiusa: senza questo, se
+   modifichi e chiudi subito, il push in coda (300ms) non parte e l'altro telefono
+   non vede l'aggiornamento finché non riapri qui. */
+function flushCloudPush(){ if(!fbReady) return; if(pushTimer){ clearTimeout(pushTimer); pushTimer=null; } if(dirty && !pendingWrite) cloudPush(); }
+document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="hidden") flushCloudPush(); });
+window.addEventListener("pagehide", flushCloudPush);
 function mergeUnion(local, server){
   const out={};
   const byId=(a,b)=>{ const m={}; [...(a||[]),...(b||[])].forEach(x=>{ if(x&&x.id) m[x.id]=x; }); return Object.values(m); };
