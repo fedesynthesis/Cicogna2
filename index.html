@@ -343,6 +343,7 @@ state.open   = state.open   || {};
 state.openBebe= state.openBebe|| {};
 state.customTabs = state.customTabs || [];  // schede aggiunte da noi: {id,emoji,name,bg,fg,from?}
 state.tabOrder = state.tabOrder || [];  // ordine delle schede (chiavi) scelto da noi
+state.deleted = state.deleted || {};    // tombstone: {id: timestamp} degli elementi cancellati
 state.weighDone= state.weighDone|| [];  // chiavi promemoria pesata archiviati
 (function seedVitD(){
   try{ if(localStorage.getItem("nido_seed_vitd")) return; }catch(e){}
@@ -534,7 +535,7 @@ function feedText(e){
   if(e.mode==="biberon") return "Biberon"+(e.ml?" · "+e.ml+" ml":"");
   return "Solido"+(e.note?" · "+e.note:"");
 }
-function delEvent(id){ state.events=state.events.filter(e=>e.id!==id); save(); render(); }
+function delEvent(id){ tomb(id); state.events=state.events.filter(e=>e.id!==id); save(); render(); }
 
 /* ============ Promemoria (in-app, condivisi) ============ */
 const VITD_START="2026-09-08", VITD_END="2027-09-08";
@@ -676,7 +677,7 @@ function renderBebe(){
       if(!state.customTabs.some(t=>t.id==="vitd")) state.customTabs.push({id:"vitd", emoji:"💊", name:"Vitamina D", bg:"#ecd7ea", fg:"#874669", from:"2026-09-08"});
       state.events.unshift({id:uid(), type:"custom", catId:"vitd", at:Date.now(), note:"4 gocce"}); state.events.sort((a,b)=>b.at-a.at); state.bebeTab="c_vitd"; toast("Aggiunta al foglio Vitamina D ✓");
     }
-    else { state.events = state.events.filter(x=> !(x.type==="custom"&&x.catId==="vitd"&&dayKey(x.at)===today)); }
+    else { state.events.filter(x=> x.type==="custom"&&x.catId==="vitd"&&dayKey(x.at)===today).forEach(x=>tomb(x.id)); state.events = state.events.filter(x=> !(x.type==="custom"&&x.catId==="vitd"&&dayKey(x.at)===today)); }
     save(); render();
   }));
   v.querySelectorAll("[data-weigh]").forEach(b=> tapSubito(b, (e)=>{ if(e&&e.stopPropagation) e.stopPropagation();
@@ -700,6 +701,7 @@ function renderBebe(){
   v.querySelectorAll("[data-tabdel]").forEach(b=> tapSubito(b, (e)=>{ if(e&&e.stopPropagation) e.stopPropagation();
     const catId=b.dataset.tabdel; const t=(state.customTabs||[]).find(x=>x.id===catId);
     askConfirm('Vuoi eliminare la scheda "'+((t&&t.name)||"")+'" e tutti i suoi eventi?', ()=>{
+      tomb(catId); state.events.filter(x=>x.type==="custom"&&x.catId===catId).forEach(x=>tomb(x.id));
       state.customTabs=(state.customTabs||[]).filter(x=>x.id!==catId);
       state.events=state.events.filter(x=>!(x.type==="custom"&&x.catId===catId));
       if(state.bebeTab==="c_"+catId) state.bebeTab=null;
@@ -711,7 +713,7 @@ function renderBebe(){
   v.querySelectorAll("[data-edit]").forEach(el=> tapSubito(el, (e)=>{ if(e&&e.target&&e.target.closest(".del")) return; const ev=state.events.find(x=>x.id===el.dataset.edit); if(ev) openEvent(ev.type, ev.id); }));
   v.querySelectorAll("[data-wedit]").forEach(el=> tapSubito(el, (e)=>{ if(e&&e.target&&e.target.closest(".del")) return; openWeight(el.dataset.wedit); }));
   v.querySelectorAll("[data-wdel]").forEach(b=> tapSubito(b, (e)=>{ if(e&&e.stopPropagation) e.stopPropagation(); const id=b.dataset.wdel;
-    askConfirm("Vuoi eliminare questa pesata?", ()=>{ state.weights=state.weights.filter(z=>z.id!==id); save(); render(); });
+    askConfirm("Vuoi eliminare questa pesata?", ()=>{ tomb(id); state.weights=state.weights.filter(z=>z.id!==id); save(); render(); });
   }));
 }
 
@@ -770,7 +772,7 @@ function renderFare(){
   tapSubito(v.querySelector("#taddbtn"), ()=>openTask());
   v.querySelectorAll("[data-tg]").forEach(b=> b.onclick=()=>{ const t=state.tasks.find(x=>x.id===b.dataset.tg); if(t){ t.done=!t.done; save(); render(); } });
   v.querySelectorAll("[data-tdel]").forEach(b=> b.onclick=(e)=>{ e.stopPropagation(); const id=b.dataset.tdel;
-    askConfirm("Vuoi eliminare questo compito?", ()=>{ state.tasks=state.tasks.filter(x=>x.id!==id); save(); render(); }); });
+    askConfirm("Vuoi eliminare questo compito?", ()=>{ tomb(id); state.tasks=state.tasks.filter(x=>x.id!==id); save(); render(); }); });
   v.querySelectorAll("[data-tedit]").forEach(el=> tapSubito(el, ()=> openTask(el.dataset.tedit)));
 }
 function taskRow(t){
@@ -820,6 +822,7 @@ function renderListe(){
   v.querySelectorAll("[data-ldel]").forEach(b=> b.onclick=(e)=>{ e.stopPropagation();
     const id=b.dataset.ldel; const l=state.lists.find(x=>x.id===id); if(!l) return;
     askConfirm('Vuoi eliminare la sezione "'+l.name+'" e tutto il suo contenuto?', ()=>{
+      tomb(id); (l.items||[]).forEach(i=>tomb(i.id));
       state.lists=state.lists.filter(x=>x.id!==id); save(); render();
     });
   });
@@ -830,7 +833,7 @@ function renderListe(){
   v.querySelectorAll("[data-iedit]").forEach(el=> tapSubito(el, ()=>{ const p=el.dataset.iedit.split("::"); openVoce(p[0],p[1]); }));
   v.querySelectorAll("[data-idel]").forEach(b=> b.onclick=(e)=>{ e.stopPropagation();
     const [lid,iid]=b.dataset.idel.split("::"); const l=state.lists.find(x=>x.id===lid);
-    if(l){ askConfirm("Vuoi eliminare questa voce?", ()=>{ l.items=l.items.filter(x=>x.id!==iid); save(); render(); }); }
+    if(l){ askConfirm("Vuoi eliminare questa voce?", ()=>{ tomb(iid); l.items=l.items.filter(x=>x.id!==iid); save(); render(); }); }
   });
   v.querySelectorAll("[data-iadd]").forEach(b=> tapSubito(b, (e)=>{ if(e&&e.stopPropagation) e.stopPropagation(); openVoce(b.dataset.iadd); }));
   const ac=v.querySelector("#laddcard");
@@ -1123,7 +1126,7 @@ const FB_CONFIG={
 /* Le regole del progetto autorizzano solo questo documento: ci scriviamo dentro i nostri
    campi SENZA toccare quelli della vecchia lista nascita (vedi merge:true più sotto). */
 const ROOM_COL="LL09Rb8OO0yjHQnJBsPCPSu1", ROOM_DOC="YXZm9MNsAFCNNQiTgQnU7LEg";
-const SYNC_KEYS=["events","tasks","lists","weights","customTabs","weighDone","tabOrder"];
+const SYNC_KEYS=["events","tasks","lists","weights","customTabs","weighDone","tabOrder","deleted"];
 const SYNC_INIT="nido_sync_init";
 const VAPID_KEY="BODxg7pjZvTAAfLUJrWec-SyHYxP_HUCanzRWyBybOqDLW2USFYhkAnPh3nXyl-VWRfpExHtgX1BoahF2F_4Mak";  // Web Push cicogna-57ae0
 let FB=null, fdoc=null, fbReady=false, pendingWrite=false, dirty=false, pushTimer=null, registerPush=null;
@@ -1133,7 +1136,21 @@ function setConn(kind,label){
   if(d) d.className="d "+kind;
   if(t&&label) t.textContent=label;
 }
-function syncedSubset(s){ const o={}; SYNC_KEYS.forEach(k=> o[k]= s[k]!=null ? s[k] : []); return o; }
+function syncedSubset(s){ const o={}; SYNC_KEYS.forEach(k=> o[k]= (k==="deleted") ? (s[k]||{}) : (s[k]!=null ? s[k] : [])); return o; }
+/* Tombstone: segno gli id cancellati così la cancellazione "vince" e non torna
+   dall'altro telefono (che altrimenti la ri-aggiungerebbe con la fusione). */
+function tomb(){ state.deleted=state.deleted||{}; for(let i=0;i<arguments.length;i++){ const id=arguments[i]; if(id) state.deleted[id]=Date.now(); } }
+function allIds(s){ const ids=new Set();
+  ["events","tasks","weights","customTabs","lists"].forEach(k=> (s[k]||[]).forEach(x=>{ if(x&&x.id) ids.add(x.id); }));
+  (s.lists||[]).forEach(l=> (l.items||[]).forEach(i=>{ if(i&&i.id) ids.add(i.id); })); return ids; }
+/* Serve un push? Solo se il mio stato ha id o tombstone che il server non ha
+   (mie aggiunte/cancellazioni da propagare). Basato su INSIEMI → niente ping-pong. */
+function needsPush(m, server){
+  const s=allIds(server), a=allIds(m); for(const id of a) if(!s.has(id)) return true;
+  const sd=server.deleted||{}, md=m.deleted||{}; for(const id in md) if(!(id in sd)) return true;
+  const sw=new Set(server.weighDone||[]); for(const d of (m.weighDone||[])) if(!sw.has(d)) return true;
+  return false;
+}
 function scheduleCloudPush(){
   if(!fbReady) return;
   dirty=true; clearTimeout(pushTimer);
@@ -1141,9 +1158,10 @@ function scheduleCloudPush(){
 }
 async function cloudPush(){
   if(!fbReady) return;
-  pendingWrite=true;
-  try{ await FB.setDoc(fdoc, syncedSubset(state), {merge:true}); dirty=false; }   // merge: non cancella i dati della lista nascita
-  catch(e){ console.warn("push", e); }
+  if(pendingWrite){ dirty=true; return; }        // già in scrittura: ripasserò a fine push
+  pendingWrite=true; dirty=false;
+  try{ await FB.setDoc(fdoc, syncedSubset(state), {merge:true}); }   // merge: non cancella i dati della lista nascita
+  catch(e){ console.warn("push", e); dirty=true; }
   pendingWrite=false;
   if(dirty) scheduleCloudPush();                 // sono arrivate altre modifiche mentre scrivevo → ripubblico
 }
@@ -1155,7 +1173,13 @@ document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState=
 window.addEventListener("pagehide", flushCloudPush);
 function mergeUnion(local, server){
   const out={};
-  const byId=(a,b)=>{ const m={}; [...(a||[]),...(b||[])].forEach(x=>{ if(x&&x.id) m[x.id]=x; }); return Object.values(m); };
+  // 1) fondo i tombstone (id cancellati) di entrambi, tengo il timestamp più recente,
+  //    e poto quelli molto vecchi (>120 giorni) per non far crescere il documento
+  const del={}; [server.deleted, local.deleted].forEach(dm=>{ if(dm) for(const id in dm){ const ts=dm[id]; if(!(id in del)||ts>del[id]) del[id]=ts; } });
+  const cutoff=Date.now()-120*864e5; for(const id in del){ if(del[id]<cutoff) delete del[id]; }
+  out.deleted=del;
+  const gone = x => x && x.id && del[x.id];                       // è stato cancellato?
+  const byId=(a,b)=>{ const m={}; [...(a||[]),...(b||[])].forEach(x=>{ if(x&&x.id&&!gone(x)) m[x.id]=x; }); return Object.values(m); };
   out.events = byId(server.events, local.events).sort((a,b)=>b.at-a.at);
   out.tasks  = byId(server.tasks,  local.tasks);
   out.weights= byId(server.weights,local.weights).sort((a,b)=>b.at-a.at);
@@ -1165,11 +1189,11 @@ function mergeUnion(local, server){
   out.tabOrder = (server.tabOrder&&server.tabOrder.length)?server.tabOrder:(local.tabOrder||[]);
   const lm={};
   [...(server.lists||[]), ...(local.lists||[])].forEach(l=>{
-    if(!l||!l.id) return;
-    if(!lm[l.id]) lm[l.id]={id:l.id, emoji:l.emoji, name:l.name, items:[...(l.items||[])]};
+    if(!l||!l.id||del[l.id]) return;                             // lista cancellata → salto
+    if(!lm[l.id]) lm[l.id]={id:l.id, emoji:l.emoji, name:l.name, items:(l.items||[]).filter(i=>!gone(i))};
     else{
       const seen=new Set(lm[l.id].items.map(i=>i.id));
-      (l.items||[]).forEach(i=>{ if(!seen.has(i.id)){ lm[l.id].items.push(i); seen.add(i.id); } });
+      (l.items||[]).forEach(i=>{ if(!gone(i) && !seen.has(i.id)){ lm[l.id].items.push(i); seen.add(i.id); } });
     }
   });
   out.lists=Object.values(lm);
@@ -1208,19 +1232,18 @@ async function initSync(){
       (snap)=>{
         if(snap.metadata.fromCache){ setConn("wait","Offline · solo questo telefono"); return; }
         setConn("on","Sincronizzato ✓");
-        if(pendingWrite || dirty) return;
         const data = snap.exists() ? snap.data() : null;
         if(!data){ cloudPush(); }
         else {
-          // FONDO SEMPRE locale + server (union per id): uno snapshot vecchio (rete
-          // ballerina o altro telefono con stato datato) non può più cancellare ciò
-          // che ho appena scritto. Se il locale aveva roba non ancora sul server,
-          // ripubblico (auto-guarigione) — solo quando serve, per non ciclare.
+          // FONDO SEMPRE locale + server (union per id + tombstone). Applico anche
+          // mentre sto scrivendo: la fusione tiene le mie modifiche in corso, quindi
+          // gli aggiornamenti dell'altro telefono compaiono SUBITO (niente più attesa).
           const m = mergeUnion(state, data);
-          const grew = SYNC_KEYS.some(k=> Array.isArray(m[k]) && m[k].length > ((data[k]||[]).length));
           SYNC_KEYS.forEach(k=> state[k]=m[k]);
           try{ localStorage.setItem(KEY,JSON.stringify(state)); }catch(e){}
-          if(grew) cloudPush();
+          // Ripubblico solo se ho aggiunte/cancellazioni che il server non ha ancora
+          // (propaga anche le cancellazioni). Basato su insiemi → converge, niente loop.
+          if(needsPush(m, data)) scheduleCloudPush();
         }
         localStorage.setItem(SYNC_INIT,"1");
         conservaCampi(render);   // non cancellare quello che si sta scrivendo
