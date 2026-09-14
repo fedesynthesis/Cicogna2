@@ -1131,7 +1131,7 @@ const SYNC_KEYS=["events","tasks","lists","weights","customTabs","docs","weighDo
 const SYNC_INIT="nido_sync_init";
 const VAPID_KEY="BODxg7pjZvTAAfLUJrWec-SyHYxP_HUCanzRWyBybOqDLW2USFYhkAnPh3nXyl-VWRfpExHtgX1BoahF2F_4Mak";  // Web Push cicogna-57ae0
 let FB=null, fdoc=null, fbReady=false, pendingWrite=false, dirty=false, pushTimer=null, registerPush=null;
-let STO=null, stoRoot=null;   // Firebase Storage (file dei documenti); null finché non attivato in console
+let fdb=null;                 // istanza Firestore (per i file dei documenti, salvati a pezzi in 'nido_files')
 let stoOk = (function(){ try{ const v=localStorage.getItem("nido_sto_ok"); return v===null?null:v==="1"; }catch(e){ return null; } })();  // null=sconosciuto, true/false=esito ultimo upload
 function setStoOk(v){ stoOk=v; try{ localStorage.setItem("nido_sto_ok", v?"1":"0"); }catch(e){} }
 
@@ -1210,11 +1210,9 @@ async function initSync(){
     const appMod = await import("https://www.gstatic.com/firebasejs/12.17.0/firebase-app.js");
     FB           = await import("https://www.gstatic.com/firebasejs/12.17.0/firebase-firestore.js");
     const app = appMod.initializeApp(FB_CONFIG);
-    fdoc = FB.doc(FB.getFirestore(app), ROOM_COL, ROOM_DOC);
+    fdb = FB.getFirestore(app);
+    fdoc = FB.doc(fdb, ROOM_COL, ROOM_DOC);
     fbReady = true;
-    // --- Storage per i documenti (attivo solo se abilitato in console: se non c'è, resta tutto locale) ---
-    try{ STO = await import("https://www.gstatic.com/firebasejs/12.17.0/firebase-storage.js"); stoRoot = STO.getStorage(app); }
-    catch(e){ STO=null; stoRoot=null; console.warn("Storage non disponibile", e); }
     // --- Notifiche push (FCM): registra il token del telefono nel documento condiviso ---
     try{
       const M = await import("https://www.gstatic.com/firebasejs/12.17.0/firebase-messaging.js");
@@ -1562,15 +1560,24 @@ function docStore(mode){ return docDB().then(db=>db.transaction("files",mode).ob
 function docSaveLocal(id, file){ return docStore("readwrite").then(st=>new Promise((res,rej)=>{
   const rec={id:id, name:file.name||"documento", type:file.type||"", size:file.size||0, at:Date.now(), blob:file};
   const rq=st.put(rec); rq.onsuccess=()=>res(id); rq.onerror=()=>rej(rq.error); })); }
-/* --- Storage: file condivisi tra telefoni (attivo solo se Storage è abilitato in console) --- */
-async function docUpload(id, file){ if(!stoRoot||!STO) return null;
-  const r=STO.ref(stoRoot,"nido-docs/"+id);
-  await STO.uploadBytes(r, file, {contentType:file.type||"application/octet-stream"});
-  return "nido-docs/"+id; }
-async function docDownload(sp){ if(!stoRoot||!STO||!sp) return null;
-  return await STO.getBlob(STO.ref(stoRoot,sp)); }
-async function docRemoveRemote(sp){ if(!stoRoot||!STO||!sp) return;
-  try{ await STO.deleteObject(STO.ref(stoRoot,sp)); }catch(e){} }
+/* --- File condivisi: salvati a PEZZI in Firestore (collezione 'nido_files'), gratis (niente Storage/Blaze) --- */
+const DOC_CHUNK = 700000;   // caratteri base64 per pezzo (< 1 MB, limite documento Firestore)
+function blobToB64(blob){ return new Promise((res,rej)=>{ const r=new FileReader();
+  r.onload=()=>{ const s=String(r.result||""); res(s.slice(s.indexOf(",")+1)); };
+  r.onerror=()=>rej(r.error); r.readAsDataURL(blob); }); }
+function b64ToBlob(b64, type){ const bin=atob(b64), len=bin.length, arr=new Uint8Array(len);
+  for(let i=0;i<len;i++) arr[i]=bin.charCodeAt(i); return new Blob([arr], {type:type||"application/octet-stream"}); }
+async function docUpload(id, file){ if(!fbReady||!fdb) return null;
+  const b64=await blobToB64(file); const chunks=[];
+  for(let i=0;i<b64.length;i+=DOC_CHUNK) chunks.push(b64.slice(i,i+DOC_CHUNK));
+  for(let n=0;n<chunks.length;n++) await FB.setDoc(FB.doc(fdb,"nido_files",id+"__"+n), {b:chunks[n]});
+  return chunks.length; }                               // ritorna il numero di pezzi
+async function docDownload(id, nc, type){ if(!fbReady||!fdb||!nc) return null;
+  let b64=""; for(let n=0;n<nc;n++){ const snap=await FB.getDoc(FB.doc(fdb,"nido_files",id+"__"+n));
+    if(!snap.exists()) return null; b64+=(snap.data().b||""); }
+  return b64ToBlob(b64, type); }
+async function docRemoveRemote(id, nc){ if(!fbReady||!fdb||!nc) return;
+  for(let n=0;n<nc;n++){ try{ await FB.deleteDoc(FB.doc(fdb,"nido_files",id+"__"+n)); }catch(e){} } }
 function docListAll(){ return docStore("readonly").then(st=>new Promise((res,rej)=>{
   const rq=st.getAll(); rq.onsuccess=()=>res((rq.result||[]).sort((a,b)=>b.at-a.at)); rq.onerror=()=>rej(rq.error); })); }
 function docGetOne(id){ return docStore("readonly").then(st=>new Promise((res,rej)=>{
@@ -1584,7 +1591,7 @@ async function docMergedList(){
   let local=[]; try{ local=await docListAll(); }catch(e){}
   const localIds=new Set(local.map(d=>d.id));
   const rows=local.map(d=>({id:d.id,name:d.name,type:d.type,size:d.size,at:d.at,remote:false}));
-  (state.docs||[]).forEach(d=>{ if(!localIds.has(d.id)) rows.push({id:d.id,name:d.name,type:d.type,size:d.size,at:d.at,remote:true,sp:d.sp}); });
+  (state.docs||[]).forEach(d=>{ if(!localIds.has(d.id)) rows.push({id:d.id,name:d.name,type:d.type,size:d.size,at:d.at,remote:true,nc:d.nc}); });
   return rows.sort((a,b)=>b.at-a.at);
 }
 async function openDocs(){
@@ -1612,7 +1619,7 @@ async function docDelete(id){
   const meta=(state.docs||[]).find(d=>d.id===id);
   state.docs=(state.docs||[]).filter(d=>d.id!==id);
   try{ await docDelOne(id); }catch(e){}
-  if(meta&&meta.sp) docRemoveRemote(meta.sp);
+  if(meta&&meta.nc) docRemoveRemote(id, meta.nc);
   save(); openDocs();
 }
 async function onDocPick(e){
@@ -1621,11 +1628,11 @@ async function onDocPick(e){
   const id=uid();
   try{
     await docSaveLocal(id, f);                 // cache locale (apertura veloce/offline)
-    let sp=null;
-    if(stoRoot){ try{ sp=await docUpload(id, f); setStoOk(true); }catch(err){ console.warn("upload doc", err); setStoOk(false); } }
-    if(sp){ state.docs=state.docs||[]; state.docs.unshift({id, name:f.name||"documento", type:f.type||"", size:f.size||0, at:Date.now(), sp}); save();
+    let nc=null;
+    if(fbReady){ try{ nc=await docUpload(id, f); setStoOk(true); }catch(err){ console.warn("upload doc", err); setStoOk(false); } }
+    if(nc){ state.docs=state.docs||[]; state.docs.unshift({id, name:f.name||"documento", type:f.type||"", size:f.size||0, at:Date.now(), nc}); save();
             toast("Documento caricato e condiviso ✓"); }
-    else { toast(stoOk===false ? "Caricato solo su questo telefono (Storage non attivo)" : "Caricato (solo su questo telefono)"); }
+    else { toast(stoOk===false ? "Caricato solo su questo telefono (condivisione non attiva)" : "Caricato (solo su questo telefono)"); }
     openDocs();
   }catch(err){ console.warn("doc save", err); toast("Non è stato possibile caricarlo"); }
 }
@@ -1669,11 +1676,11 @@ async function viewDoc(id){
   if(!blob){
     // non in cache locale: lo scarico da Storage con i metadati condivisi
     const meta=(state.docs||[]).find(x=>x.id===id);
-    if(!meta||!meta.sp){ toast("Documento non disponibile su questo telefono"); return; }
+    if(!meta||!meta.nc){ toast("Documento non disponibile su questo telefono"); return; }
     type=meta.type; name=meta.name;
     dv.hidden=false; document.getElementById("scrim").classList.remove("on");
     body.innerHTML='<div class="dv-msg">Scarico il documento…</div>';
-    try{ blob=await docDownload(meta.sp); }catch(err){ console.warn("download doc", err); }
+    try{ blob=await docDownload(id, meta.nc, meta.type); }catch(err){ console.warn("download doc", err); }
     if(!blob){ body.innerHTML='<div class="dv-msg">Non riesco a scaricare il documento.<br>Riprova con la connessione attiva.</div>'; return; }
     try{ await docSaveLocal(id, new File([blob], name, {type})); }catch(e){}   // metto in cache per le prossime volte
   }
