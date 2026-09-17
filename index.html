@@ -308,6 +308,7 @@
       <div class="hdr-actions">
         <button class="share-btn" id="chartBtn">📈 Andamento</button>
         <button class="share-btn" id="docBtn">📄 Documenti</button>
+        <button class="share-btn" id="numBtn">☎️ Numeri utili</button>
       </div>
     </header>
 
@@ -347,6 +348,7 @@ state.customTabs = state.customTabs || [];  // schede aggiunte da noi: {id,emoji
 state.tabOrder = state.tabOrder || [];  // ordine delle schede (chiavi) scelto da noi
 state.deleted = state.deleted || {};    // tombstone: {id: timestamp} degli elementi cancellati
 state.docs = state.docs || [];          // metadati documenti condivisi: {id,name,type,size,at,sp} (file su Storage)
+state.numbers = state.numbers || [];    // numeri utili: {id, name, tel, at}
 state.weighDone= state.weighDone|| [];  // chiavi promemoria pesata archiviati
 (function seedVitD(){
   try{ if(localStorage.getItem("nido_seed_vitd")) return; }catch(e){}
@@ -1129,7 +1131,7 @@ const FB_CONFIG={
 /* Le regole del progetto autorizzano solo questo documento: ci scriviamo dentro i nostri
    campi SENZA toccare quelli della vecchia lista nascita (vedi merge:true più sotto). */
 const ROOM_COL="LL09Rb8OO0yjHQnJBsPCPSu1", ROOM_DOC="YXZm9MNsAFCNNQiTgQnU7LEg";
-const SYNC_KEYS=["events","tasks","lists","weights","customTabs","docs","weighDone","tabOrder","deleted"];
+const SYNC_KEYS=["events","tasks","lists","weights","customTabs","docs","numbers","weighDone","tabOrder","deleted"];
 const SYNC_INIT="nido_sync_init";
 const VAPID_KEY="BODxg7pjZvTAAfLUJrWec-SyHYxP_HUCanzRWyBybOqDLW2USFYhkAnPh3nXyl-VWRfpExHtgX1BoahF2F_4Mak";  // Web Push cicogna-57ae0
 let FB=null, fdoc=null, fbReady=false, pendingWrite=false, dirty=false, pushTimer=null, registerPush=null;
@@ -1147,7 +1149,7 @@ function syncedSubset(s){ const o={}; SYNC_KEYS.forEach(k=> o[k]= (k==="deleted"
    dall'altro telefono (che altrimenti la ri-aggiungerebbe con la fusione). */
 function tomb(){ state.deleted=state.deleted||{}; for(let i=0;i<arguments.length;i++){ const id=arguments[i]; if(id) state.deleted[id]=Date.now(); } }
 function allIds(s){ const ids=new Set();
-  ["events","tasks","weights","customTabs","lists","docs"].forEach(k=> (s[k]||[]).forEach(x=>{ if(x&&x.id) ids.add(x.id); }));
+  ["events","tasks","weights","customTabs","lists","docs","numbers"].forEach(k=> (s[k]||[]).forEach(x=>{ if(x&&x.id) ids.add(x.id); }));
   (s.lists||[]).forEach(l=> (l.items||[]).forEach(i=>{ if(i&&i.id) ids.add(i.id); })); return ids; }
 /* Serve un push? Solo se il mio stato ha id o tombstone che il server non ha
    (mie aggiunte/cancellazioni da propagare). Basato su INSIEMI → niente ping-pong. */
@@ -1192,6 +1194,7 @@ function mergeUnion(local, server){
   const uniq=(a,b)=>[...new Set([...(a||[]),...(b||[])])];
   out.customTabs = byId(server.customTabs, local.customTabs);
   out.docs = byId(server.docs, local.docs).sort((a,b)=>b.at-a.at);   // metadati documenti (file su Storage)
+  out.numbers = byId(server.numbers, local.numbers).sort((a,b)=>b.at-a.at);   // numeri utili
   out.weighDone = uniq(server.weighDone, local.weighDone);
   out.tabOrder = (server.tabOrder&&server.tabOrder.length)?server.tabOrder:(local.tabOrder||[]);
   const lm={};
@@ -1697,6 +1700,54 @@ function closeDocView(){ const dv=document.getElementById("docview"); dv.hidden=
   if(dv._url){ try{ URL.revokeObjectURL(dv._url); }catch(e){} dv._url=null; }
   document.getElementById("dvBody").innerHTML=""; openDocs(); }
 
+/* ============ Numeri utili (condivisi tra i telefoni) ============ */
+const telHref = t => "tel:"+String(t||"").replace(/[^\d+]/g,"");
+function openNums(){
+  const s=document.getElementById("sheet");
+  const list=(state.numbers||[]).slice().sort((a,b)=>b.at-a.at);
+  s.innerHTML='<h3>Numeri utili</h3><div class="hint">Pediatra, guardia medica, farmacia… tocca un numero per chiamare</div>'
+    + (list.length ? list.map(n=>'<div class="doc-row"><div class="di">☎️</div>'
+        +'<div class="dn tocca" data-numcall="'+n.id+'"><b>'+esc(n.name||"Numero")+'</b><span>'+esc(n.tel||"")+'</span></div>'
+        +'<button class="dd" data-numedit="'+n.id+'" aria-label="Modifica">✏️</button>'
+        +'<button class="dd" data-numdel="'+n.id+'" aria-label="Elimina">🗑</button></div>').join("")
+      : '<div class="empty" style="padding:22px"><span class="e">📇</span>Ancora nessun numero.<br>Tocca qui sotto per aggiungerne uno.</div>')
+    + '<button class="doc-add" id="numAddBtn">＋ Aggiungi numero</button>'
+    + '<button class="cancel" id="numClose">Chiudi</button>';
+  document.getElementById("scrim").classList.add("on");
+  s.querySelector("#numAddBtn").onclick=()=>openNumEdit();
+  s.querySelectorAll("[data-numcall]").forEach(el=> el.onclick=()=>{ const n=(state.numbers||[]).find(x=>x.id===el.dataset.numcall); if(n&&n.tel) window.location.href=telHref(n.tel); });
+  s.querySelectorAll("[data-numedit]").forEach(b=> b.onclick=(e)=>{ e.stopPropagation(); openNumEdit(b.dataset.numedit); });
+  s.querySelectorAll("[data-numdel]").forEach(b=> b.onclick=(e)=>{ e.stopPropagation(); const id=b.dataset.numdel;
+    askConfirm("Vuoi eliminare questo numero?", ()=>numDelete(id)); });
+  s.querySelector("#numClose").onclick=()=>document.getElementById("scrim").classList.remove("on");
+}
+function openNumEdit(id){
+  const s=document.getElementById("sheet");
+  const n0 = id ? (state.numbers||[]).find(x=>x.id===id) : null;
+  s.innerHTML =
+    '<h3>'+(n0?"Modifica numero":"Nuovo numero")+'</h3><div class="hint">Descrizione e numero di telefono</div>'
+    + '<div class="lbl">Descrizione</div><div class="fld"><input id="nnome" type="text" placeholder="es. Pediatra Dr. Rossi" value="'+esc(n0?(n0.name||""):"")+'"></div>'
+    + '<div class="lbl">Numero</div><div class="fld"><input id="ntel" type="tel" inputmode="tel" placeholder="es. 030 123456" value="'+esc(n0?(n0.tel||""):"")+'"></div>'
+    + '<button class="go" id="ngo">'+(n0?"Salva modifiche":"Aggiungi")+'</button>'
+    + '<button class="cancel" id="ncancel">Annulla</button>';
+  document.getElementById("scrim").classList.add("on");
+  s.querySelector("#ngo").onclick=()=>{
+    const name=s.querySelector("#nnome").value.trim();
+    const tel=s.querySelector("#ntel").value.trim();
+    if(!tel){ toast("Scrivi il numero"); return; }
+    if(n0){ state.numbers=(state.numbers||[]).map(x=> x.id===n0.id ? {id:n0.id, name:name, tel:tel, at:n0.at||Date.now()} : x); }
+    else { state.numbers=state.numbers||[]; state.numbers.unshift({id:uid(), name:name, tel:tel, at:Date.now()}); }
+    save(); openNums(); toast(n0?"Numero salvato":"Numero aggiunto");
+  };
+  s.querySelector("#ncancel").onclick=()=>openNums();
+}
+function numDelete(id){
+  tomb(id);
+  state.numbers=(state.numbers||[]).filter(x=>x.id!==id);
+  save(); openNums();
+}
+
+document.getElementById("numBtn").addEventListener("click", openNums);
 document.getElementById("docBtn").addEventListener("click", openDocs);
 document.getElementById("docInput").addEventListener("change", onDocPick);
 document.getElementById("dvClose").addEventListener("click", closeDocView);
