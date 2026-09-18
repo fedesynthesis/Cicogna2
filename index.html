@@ -22,6 +22,8 @@
     --butter:#f4cd78; --coral:#ef9a85; --sky:#8ec5e8;
     --shadow-soft:0 6px 20px rgba(38,52,42,.07);
     --r:22px;
+    /* Percorso sensoriale: 6 tappe distinte, tonalità della palette Nido */
+    --pc1:#aacfe6; --pc2:#a6d6b6; --pc3:#f4cd78; --pc4:#f3b79c; --pc5:#e8a6b2; --pc6:#c3aedd;
   }
   *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
   body{background:var(--bg);color:var(--ink);font-family:'Inter',system-ui,-apple-system,sans-serif;
@@ -96,10 +98,10 @@
   .ch-empty{text-align:center;color:var(--ink-soft);padding:30px 16px;font-size:14px}
 
   /* macro */
-  .macro{display:flex;gap:8px;background:var(--surface);border-radius:var(--r);padding:6px;
+  .macro{display:flex;gap:5px;background:var(--surface);border-radius:var(--r);padding:6px;
     margin:20px 0 6px;box-shadow:var(--shadow-soft)}
-  .macro button{flex:1;border:none;background:none;font-family:'Quicksand';font-weight:600;font-size:14.5px;
-    color:var(--ink-soft);padding:11px 6px;border-radius:16px;cursor:pointer;transition:.18s}
+  .macro button{flex:1;border:none;background:none;font-family:'Quicksand';font-weight:600;font-size:13px;
+    color:var(--ink-soft);padding:11px 3px;border-radius:16px;cursor:pointer;transition:.18s;white-space:nowrap}
   .macro button.active{background:var(--sage);color:#fff}
 
   .chips{display:flex;gap:8px;overflow-x:auto;padding:14px 18px 4px;margin:0 -18px;scrollbar-width:none}
@@ -274,6 +276,81 @@
     opacity:0;pointer-events:none;transition:.25s;z-index:300}
   .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
   .note{text-align:center;color:var(--ink-soft);font-size:12.5px;padding:22px 10px 10px;line-height:1.6}
+
+  /* ===== Percorso sensoriale 0–12 mesi (classi pc- per non collidere) ===== */
+  .pc-timeline{margin:2px 0 16px}
+  .pc-track{position:relative;height:12px;border-radius:99px;overflow:hidden;display:flex;background:var(--line)}
+  .pc-track span{flex:1;height:100%}
+  .pc-track span.past{opacity:.45}
+  .pc-markwrap{position:relative;height:0}
+  .pc-marker{position:absolute;top:-18px;width:22px;height:22px;border-radius:50%;background:var(--surface);
+    border:3px solid var(--sage);transform:translateX(-50%);box-shadow:var(--shadow-soft);transition:left .6s cubic-bezier(.4,0,.2,1)}
+  .pc-stages{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;margin-top:12px}
+  .pc-stage{display:flex;flex-direction:column;align-items:center;gap:5px;padding:8px 2px;border:none;background:none;
+    border-radius:13px;cursor:pointer;font-family:'Quicksand';min-height:58px}
+  .pc-stage .d{width:11px;height:11px;border-radius:50%;background:var(--c);border:2px solid transparent}
+  .pc-stage .l{font-size:10.5px;line-height:1.15;text-align:center;color:var(--ink-soft);font-weight:600}
+  .pc-stage .p{font-size:10px;color:var(--ink-soft);opacity:.75}
+  .pc-stage.on{background:var(--surface);box-shadow:var(--shadow-soft)}
+  .pc-stage.on .l{color:var(--ink);font-weight:700}
+  .pc-stage.on .d{border-color:var(--ink)}
+  .pc-panel{background:var(--surface);border-radius:var(--r);box-shadow:var(--shadow-soft);overflow:hidden;margin-bottom:14px}
+  .pc-head{padding:18px 16px 14px;border-top:7px solid var(--c)}
+  .pc-head .a{font-size:12.5px;color:var(--ink-soft)}
+  .pc-head h2{font-family:'Quicksand';font-weight:700;font-size:21px;line-height:1.15;margin:3px 0 8px}
+  .pc-head p{color:var(--ink-soft);font-size:14px;line-height:1.45}
+  .pc-prog{display:flex;align-items:center;gap:10px;padding:0 16px 14px}
+  .pc-bar{flex:1;height:8px;border-radius:99px;background:var(--line);overflow:hidden}
+  .pc-bar i{display:block;height:100%;background:var(--sage);border-radius:99px;transition:width .4s}
+  .pc-prog b{font-family:'Quicksand';font-size:13px;color:var(--ink-soft);min-width:62px;text-align:right}
+  .pc-tabs{display:flex;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .pc-tabs button{flex:1;padding:13px 8px;border:none;background:none;font-family:'Quicksand';font-weight:700;
+    font-size:14px;color:var(--ink-soft);border-bottom:3px solid transparent;margin-bottom:-1px;cursor:pointer}
+  .pc-tabs button.on{color:var(--ink);border-color:var(--c)}
+  .pc-view{padding:4px 16px 16px}
+  .pc-sense{border-bottom:1px solid var(--line)}
+  .pc-sense:last-child{border-bottom:0}
+  .pc-sense>button{width:100%;display:flex;align-items:center;gap:11px;padding:14px 0;text-align:left;
+    border:none;background:none;cursor:pointer;min-height:58px}
+  .pc-ic{width:34px;height:34px;border-radius:11px;background:var(--c);display:grid;place-items:center;flex:none;color:#26342a}
+  .pc-ic svg{width:18px;height:18px}
+  .pc-t{flex:1;min-width:0}
+  .pc-t strong{display:block;font-family:'Quicksand';font-weight:700;font-size:15.5px;line-height:1.2}
+  .pc-t span{display:block;font-size:12.5px;color:var(--ink-soft);line-height:1.3;margin-top:2px}
+  .pc-cv{width:19px;height:19px;flex:none;color:var(--ink-soft);transition:transform .25s}
+  .pc-sense.open .pc-cv{transform:rotate(180deg)}
+  .pc-body{display:none;padding:0 0 14px 45px}
+  .pc-sense.open .pc-body{display:block}
+  .pc-body ul{margin:0;padding-left:17px}
+  .pc-body li{margin:5px 0;font-size:14px;line-height:1.45}
+  .pc-body li::marker{color:var(--sage)}
+  .pc-check{list-style:none;margin:0;padding:4px 0 0}
+  .pc-check li{border-bottom:1px solid var(--line)}
+  .pc-check li:last-child{border-bottom:0}
+  .pc-check label{display:flex;gap:12px;align-items:flex-start;padding:14px 0;cursor:pointer;min-height:58px}
+  .pc-check input{position:absolute;opacity:0;width:1px;height:1px}
+  .pc-box{width:25px;height:25px;border-radius:9px;border:2px solid var(--line);flex:none;margin-top:1px;
+    display:grid;place-items:center;transition:background .2s,border-color .2s}
+  .pc-box svg{width:14px;height:14px;opacity:0;transform:scale(.6);transition:.2s;color:#fff}
+  .pc-check input:checked + .pc-box{background:var(--sage);border-color:var(--sage)}
+  .pc-check input:checked + .pc-box svg{opacity:1;transform:scale(1)}
+  .pc-check input:checked ~ .pc-tx{color:var(--ink-soft);text-decoration:line-through;text-decoration-color:var(--line)}
+  .pc-tx{font-size:14.5px;line-height:1.4}
+  .pc-rule{background:var(--surface);border-radius:18px;box-shadow:var(--shadow-soft);padding:0 16px;margin-bottom:10px}
+  .pc-rule summary{padding:15px 0;font-family:'Quicksand';font-weight:700;font-size:15px;cursor:pointer;
+    list-style:none;display:flex;justify-content:space-between;align-items:center;min-height:54px}
+  .pc-rule summary::-webkit-details-marker{display:none}
+  .pc-rule summary::after{content:"+";font-family:'Quicksand';font-size:21px;color:var(--ink-soft)}
+  .pc-rule[open] summary::after{content:"–"}
+  .pc-rule ul{margin:0 0 14px;padding-left:19px;color:var(--ink-soft);font-size:14px}
+  .pc-rule li{margin:6px 0;line-height:1.45}
+  .pc-rule>p{color:var(--ink-soft);font-size:14px;margin:0 0 10px;line-height:1.45}
+  .pc-rule table{width:100%;border-collapse:collapse;margin:0 0 14px;font-size:13.5px}
+  .pc-rule td{padding:8px 6px 8px 0;border-top:1px solid var(--line);vertical-align:top;color:var(--ink-soft);line-height:1.4}
+  .pc-rule td:first-child{white-space:nowrap;font-weight:700;width:5.2em;color:var(--ink)}
+  .pc-scroll{overflow-x:auto}
+  .pc-note{font-size:12.5px;color:var(--ink-soft);margin:16px 2px 0;line-height:1.5}
+  @media (max-width:380px){ .pc-stage .l{font-size:9.5px} .pc-body{padding-left:0} }
 </style>
 </head>
 <body>
@@ -349,6 +426,7 @@ state.tabOrder = state.tabOrder || [];  // ordine delle schede (chiavi) scelto d
 state.deleted = state.deleted || {};    // tombstone: {id: timestamp} degli elementi cancellati
 state.docs = state.docs || [];          // metadati documenti condivisi: {id,name,type,size,at,sp} (file su Storage)
 state.numbers = state.numbers || [];    // numeri utili: {id, name, tel, at}
+state.percorso = state.percorso || { sel:0, tab:"senses", open:{}, done:{}, manual:false };  // percorso sensoriale (solo locale)
 state.weighDone= state.weighDone|| [];  // chiavi promemoria pesata archiviati
 (function seedVitD(){
   try{ if(localStorage.getItem("nido_seed_vitd")) return; }catch(e){}
@@ -412,7 +490,7 @@ function sinceLabel(ms){
 }
 
 /* ============ Macro ============ */
-const MACROS=[{id:"bebe",label:"👶 Bebè"},{id:"fare",label:"✅ Da fare"},{id:"liste",label:"🛒 Liste"}];
+const MACROS=[{id:"bebe",label:"👶 Bebè"},{id:"fare",label:"✅ Da fare"},{id:"liste",label:"🛒 Liste"},{id:"percorso",label:"🌱 Percorso"}];
 function buildMacro(){
   const el=document.getElementById("macro"); el.innerHTML="";
   MACROS.forEach(m=>{
@@ -1107,15 +1185,162 @@ function fillBirth(){
   const a=document.getElementById("age");
   if(a){ const eta=etaTesto(); a.textContent = eta ? (eta.match(/^\d/) ? eta : eta) : ""; }
 }
+/* ============ Percorso sensoriale 0–12 mesi (tab "Percorso") ============ */
+const PC_ICONS = {
+  tatto:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-4 0v5"/><path d="M14 10V4a2 2 0 0 0-4 0v2"/><path d="M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>',
+  udito:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8.5a6.5 6.5 0 1 1 13 0c0 6-6 6-6 10a3.5 3.5 0 1 1-7 0"/><path d="M15 8.5a2.5 2.5 0 0 0-5 0v1a2 2 0 1 1 0 4"/></svg>',
+  vista:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>',
+  olfatto:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c4 4 5 7 5 10a5 5 0 0 1-10 0c0-3 1-6 5-10z"/><path d="M12 13v8"/></svg>',
+  moto:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13" cy="4" r="2"/><path d="M7 21l3-6 3 2 2-5-4-3-2 4"/><path d="M14 9l3 3 3-2"/></svg>',
+  voce:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-12 7l-5 2 1.5-4.5A8 8 0 1 1 21 12z"/></svg>',
+  gusto:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11h16v2a8 8 0 0 1-16 0z"/><path d="M12 3v4"/><path d="M8 5l1 3"/><path d="M16 5l-1 3"/></svg>',
+  corpo:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v6"/><path d="M5 9l7-1 7 1"/><path d="M12 22l-3-8 3-2 3 2z"/></svg>',
+  mani:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/><path d="M13 7h8M7 13v8"/></svg>',
+  causa:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg>',
+  imita:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="3"/><circle cx="16" cy="16" r="3"/><path d="M11 8h5M8 11v5"/></svg>',
+  ritmo:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>'
+};
+
+const PC_STAGES = [
+ {id:'s1',color:'var(--pc1)',short:'0–4 sett.',age:'Settimane 0–4',from:0,to:28,title:'Adattamento',
+  intro:'Vede nitido a 20–30 cm, riconosce voce e odore della madre, ha riflessi ma nessun controllo volontario. L\'obiettivo del mese è la regolazione, non la stimolazione: contatto, calma, poche cose fatte bene.',
+  senses:[
+   {k:'tatto',n:'Tatto',what:'Il senso più maturo: il contatto pelle a pelle regola battito e temperatura',do:['Pelle a pelle 30–60 min al giorno','Massaggio lento con olio di mandorle dopo il bagnetto','Fasciatura (swaddling) per il sonno']},
+   {k:'udito',n:'Udito',what:'Preferisce la voce umana e i suoni gravi e ritmici',do:['Parlare e cantare a 20–30 cm dal viso','Rumore bianco o battito registrato per calmarlo','Una sola voce alla volta']},
+   {k:'vista',n:'Vista',what:'Bianco e nero, contorni ad alto contrasto, segue per pochi gradi',do:['Volto del genitore a 20–25 cm','2–3 card bianco/nero (spirale, scacchiera) accanto al fasciatoio, cambiate ogni 3–4 giorni']},
+   {k:'olfatto',n:'Olfatto',what:'Riconosce l\'odore materno dai primi giorni',do:['Un indumento indossato dalla madre nella culla','Nessun profumo sul genitore']},
+   {k:'moto',n:'Movimento',what:'Riflessi; testa che cade se non sostenuta',do:['Tummy time 1–2 min, 3–4 volte al giorno, sul petto del genitore','Dondolo lento in braccio']}
+  ],
+  todo:['Preparare 3 card ad alto contrasto (stampate in casa, formato A5)','Scegliere un olio per massaggio senza profumo','Iniziare il tummy time sul petto dal giorno 3–5','Stabilire un rituale fisso: bagnetto → massaggio → poppata → nanna']},
+ {id:'s2',color:'var(--pc2)',short:'5–8 sett.',age:'Settimane 5–8',from:28,to:56,title:'Primo sorriso e inseguimento visivo',
+  intro:'Tra la 6ª e l\'8ª settimana arrivano il sorriso sociale, l\'inseguimento a 180°, i primi vocalizzi e la testa a 45° nel tummy time. La veglia attiva sale a 45–60 minuti: entrano le prime attività strutturate.',
+  senses:[
+   {k:'vista',n:'Vista',what:'Segue un oggetto lento da un lato all\'altro; inizia a distinguere il rosso',do:['Card bianco/nero/rosso','Oggetto a contrasto mosso lentamente in arco a 25 cm','Giostrina a contrasto sopra il fasciatoio, mai sopra la culla del sonno']},
+   {k:'udito',n:'Udito',what:'Localizza il suono girando gli occhi, poi la testa',do:['Sonaglio morbido a destra e a sinistra, pausa 5 secondi, cambio lato','Canzoni sempre uguali: ne bastano 3–4']},
+   {k:'tatto',n:'Tatto',what:'Apre le mani più spesso; il palmo è molto sensibile',do:['Sfiorare il palmo con tessuti diversi: cotone, lana, seta, spugna','Massaggio esteso a mani e piedi']},
+   {k:'voce',n:'Vocalizzazione',what:'Risponde alla voce con suoni',do:['Turni di conversazione: lui vocalizza, tu rispondi imitandolo, pausa, aspetta']},
+   {k:'moto',n:'Movimento',what:'Solleva la testa a 45°; scalcia in modo alternato',do:['Tummy time 3–5 min, 4–5 volte al giorno, con specchio infrangibile davanti','Bicicletta con le gambe']}
+  ],
+  todo:['Aggiungere una card rossa e uno specchio da tummy time','Comprare o fare 2 sonagli morbidi di suono diverso','Portare il tummy time a 15–20 min totali al giorno entro la settimana 8','Iniziare a leggere ad alta voce 5 min al giorno']},
+ {id:'s3',color:'var(--pc3)',short:'9–12 sett.',age:'Settimane 9–12',from:56,to:91,title:'Mani scoperte e primi colori',
+  intro:'Scopre le proprie mani, le porta alla bocca, colpisce gli oggetti appesi, ride e tiene la testa a 90° sugli avambracci. La visione dei colori si completa: dal bianco/nero ai colori pieni e saturi.',
+  senses:[
+   {k:'vista',n:'Vista',what:'Distingue i colori primari; mette a fuoco fino a 1 m; guarda le proprie mani',do:['Oggetti rossi, gialli, blu a tinta unita','Palestrina con 2–3 pendenti a 20–25 cm dal petto, cambiati ogni settimana']},
+   {k:'tatto',n:'Tatto e prensione',what:'Colpisce a caso, poi afferra brevemente',do:['Anello di legno o sonaglio leggero messo in mano','Pendenti da colpire','Tessuti diversi da stringere']},
+   {k:'udito',n:'Udito',what:'Distingue il tono emotivo della voce; si calma con la musica',do:['Campanellino con nastro corto alla palestrina','Canzoni con gesti ripetuti','Voce che cambia intonazione']},
+   {k:'corpo',n:'Propriocezione',what:'Sente il corpo nello spazio',do:['Dondolo avanti e indietro seduto sulle ginocchia','Alzarlo lentamente in verticale','Massaggio con pressione più decisa']},
+   {k:'moto',n:'Movimento',what:'Testa a 90°, appoggio sugli avambracci, primi tentativi di rotolare',do:['Tummy time 5–10 min con oggetto davanti','Sulla schiena, oggetto spostato in alto per lo sguardo verso l\'alto']}
+  ],
+  todo:['Montare la palestrina (pendenti a 20–25 cm, non più di 3)','Comprare 2 anelli di legno e un sonaglio leggero (max 40 g)','Sostituire le card bianco/nero con oggetti a colori pieni','Tummy time totale 30 min al giorno entro la settimana 12']},
+ {id:'s4',color:'var(--pc4)',short:'4–6 mesi',age:'Mesi 4–6',from:91,to:182,title:'Afferrare, rotolare, sedersi',
+  intro:'Prensione volontaria, passaggio da una mano all\'altra, rotolamento in entrambi i sensi, seduta con appoggio e prime sillabe. La bocca diventa lo strumento principale di esplorazione: tutto ciò che arriva in mano finisce in bocca, ed è corretto così.',
+  senses:[
+   {k:'tatto',n:'Tatto e manipolazione',what:'Afferra con tutta la mano, porta alla bocca, passa da una mano all\'altra',do:['Cestino dei tesori: 8–10 oggetti di materiali diversi (legno, metallo, stoffa, spugna, silicone, gomma naturale), seduto tra le gambe del genitore','Cambiare 3 oggetti ogni settimana']},
+   {k:'vista',n:'Vista',what:'Vede in 3D, segue oggetti veloci, cerca oggetti parzialmente nascosti',do:['Cucù con una stoffa','Oggetto fatto rotolare lentamente','Specchio a terra durante il gioco']},
+   {k:'voce',n:'Udito e linguaggio',what:'Balbetta a sillabe; reagisce al proprio nome (5–6 mesi)',do:['Nominare ogni oggetto che tocca','Libri cartonati con una figura per pagina','Suoni diversi: sonaglio, carta stropicciata, cucchiaio su pentola']},
+   {k:'gusto',n:'Gusto e olfatto',what:'Dal 6º mese lo svezzamento apre gusto e olfatto',do:['Un sapore nuovo per volta, 3 giorni ciascuno','Annusare frutta e verdura prima di assaggiarle']},
+   {k:'corpo',n:'Vestibolare',what:'Cerca movimento e cambi di posizione',do:['Aeroplanino sulle gambe del genitore','Dondolo laterale','Sollevare e abbassare lentamente']},
+   {k:'moto',n:'Movimento',what:'Rotola, si sostiene a braccia tese, prime spinte all\'indietro',do:['Oggetto appena fuori portata nel tummy time','Seduto con cuscini a U dietro','In piedi pochi secondi sostenuto sotto le ascelle']}
+  ],
+  todo:['Preparare il cestino dei tesori (cesto di vimini basso, bordo 10–12 cm)','Comprare 3–4 libri cartonati e un anello di gomma naturale per la dentizione','Liberare uno spazio a terra di almeno 2×2 m con tappeto','Concordare col pediatra la data di inizio svezzamento']},
+ {id:'s5',color:'var(--pc5)',short:'7–9 mesi',age:'Mesi 7–9',from:182,to:273,title:'Seduto, gattona, causa-effetto',
+  intro:'Sta seduto da solo, gattona (o striscia, o si sposta seduto: ogni modo va bene), usa la pinza pollice-indice, capisce che un oggetto nascosto continua a esistere. Il gioco diventa attivo: fa cadere, batte, cerca, apre.',
+  senses:[
+   {k:'mani',n:'Manipolazione fine',what:'Pinza pollice-indice; batte due oggetti; lascia andare volontariamente',do:['Pezzetti di cibo morbido da raccogliere (pisello cotto, banana)','Scatola con foro per infilare tappi grandi','Due cubi da battere']},
+   {k:'causa',n:'Causa-effetto',what:'Ripete l\'azione che produce un risultato',do:['Giochi con bottone che accende luce o suono','Far cadere oggetti dal seggiolone (è un esperimento, non un dispetto)','Torre di cubi da buttare giù']},
+   {k:'tatto',n:'Tatto e texture',what:'Tollera e cerca sensazioni nuove sul corpo intero',do:['Vaschetta con acqua tiepida e mestoli','Erba, sabbia, tappeti diversi a piedi nudi','Pasta cotta e purea di frutta da manipolare in seggiolone']},
+   {k:'voce',n:'Udito e linguaggio',what:'Balbetta a catene ("bababa"); capisce il "no" e il proprio nome',do:['Libri con animali e relativi versi','Canzoni con gesti da imitare','Nominare parti del corpo toccandole']},
+   {k:'vista',n:'Vista e permanenza',what:'Cerca l\'oggetto nascosto; guarda dove indichi',do:['Nascondere un gioco sotto una stoffa mentre guarda','Cucù dietro l\'angolo','Indicare oggetti lontani']},
+   {k:'moto',n:'Movimento',what:'Si mette seduto da solo, gattona, si tira in piedi appoggiandosi',do:['Percorso a terra con cuscini da superare','Oggetto sul divano per invogliare a tirarsi su','Tunnel di stoffa']}
+  ],
+  todo:['Mettere in sicurezza la casa: prese, spigoli, cancelletto scale, prodotti sotto il lavello (entro il 7º mese)','Preparare una scatola dei suoni (contenitori chiusi con riso, sassi, campanelli)','Comprare cubi in legno grandi (min 4 cm) e una vaschetta bassa per l\'acqua','Prima uscita a piedi nudi su erba o sabbia']},
+ {id:'s6',color:'var(--pc6)',short:'10–12 mesi',age:'Mesi 10–12',from:273,to:365,title:'In piedi, prime parole, imitazione',
+  intro:'Cammino con appoggio o primi passi, prime parole con significato, il gesto di indicare, il saluto con la mano e l\'imitazione degli adulti. Il gioco diventa simbolico e sociale: vuole fare quello che fai tu.',
+  senses:[
+   {k:'mani',n:'Manipolazione fine',what:'Infila, impila, apre coperchi, gira pagine',do:['Incastri a 3–4 pezzi con pomello','Anelli da infilare su un perno','Barattoli con coperchio a pressione','Scatola con fessura per fiches']},
+   {k:'voce',n:'Linguaggio',what:'1–3 parole; capisce 20–50 parole; indica per chiedere',do:['Dare il nome a ciò che indica, sempre','Libri con domanda "dov\'è il…?"','Canzoni con parole che lui completa']},
+   {k:'imita',n:'Imitazione e gioco simbolico',what:'Copia gesti: pettinarsi, telefonare, dare da mangiare',do:['Cucchiaio e ciotola vuoti','Telefono giocattolo','Bambola o peluche da nutrire e mettere a nanna','Spugna per "pulire"']},
+   {k:'tatto',n:'Tatto e sensoriale',what:'Cerca esperienze intense e sporchevoli',do:['Pittura a dita con yogurt colorato','Pasta di sale','Bacinella con pasta cruda e mestoli','Sabbia cinetica sorvegliata']},
+   {k:'ritmo',n:'Udito e ritmo',what:'Si muove a tempo di musica; batte le mani',do:['Tamburo (pentola e cucchiaio di legno), maracas, xilofono','Ballare insieme','Ascoltare generi diversi']},
+   {k:'moto',n:'Movimento',what:'In piedi da solo, cammina con appoggio, si accovaccia',do:['Carrellino da spingere (pesante, non ribaltabile)','Scalino basso da salire','Palla da far rotolare e rincorrere']}
+  ],
+  todo:['Comprare un carrellino da spingere e un primo incastro a pomello','Preparare una "cucina" con pentolini e cucchiai veri','Iniziare lettura serale fissa con 2–3 libri sempre uguali','Prima esperienza in acqua (corso neonatale o piscina con genitore)']}
+];
+
+const PC_CHECK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7"/></svg>';
+const PC_CHEV='<svg class="pc-cv" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
+
+function pcS(){ state.percorso = state.percorso || {sel:0,tab:"senses",open:{},done:{},manual:false}; return state.percorso; }
+/* età in giorni dalla data di nascita già presente in Nido (NASCITA) — nessun secondo input */
+function pcAgeDays(){ const b=new Date(NASCITA.ms); b.setHours(0,0,0,0); const n=new Date(); n.setHours(0,0,0,0); return Math.round((n-b)/86400000); }
+function pcPct(i){ const s=PC_STAGES[i], p=pcS(); const d=s.todo.filter((_,j)=>p.done[s.id+":"+j]).length; return Math.round(d/s.todo.length*100); }
+
+function renderPercorso(){
+  const v=document.getElementById("view"), p=pcS(), days=pcAgeDays();
+  // la tappa si posiziona da sola sull'età, finché non ne scegli una a mano
+  if(days>=0 && !p.manual){ const cur=PC_STAGES.findIndex(s=>days>=s.from&&days<s.to); if(cur>=0) p.sel=cur; }
+  if(p.sel<0||p.sel>=PC_STAGES.length) p.sel=0;
+  const s=PC_STAGES[p.sel], pct=pcPct(p.sel);
+
+  let h='<div class="pc-timeline"><div class="pc-track">'
+    + PC_STAGES.map(x=>'<span style="background:'+x.color+'"'+(days>=x.to?' class="past"':'')+'></span>').join('')
+    + '</div><div class="pc-markwrap">'
+    + (days>=0 ? '<div class="pc-marker" style="left:'+(Math.min(days,365)/365*100)+'%"></div>' : '')
+    + '</div><div class="pc-stages">'
+    + PC_STAGES.map((x,i)=>'<button type="button" class="pc-stage'+(i===p.sel?' on':'')+'" style="--c:'+x.color+'" data-pcs="'+i+'"><span class="d"></span><span class="l">'+x.short+'</span><span class="p">'+pcPct(i)+'%</span></button>').join('')
+    + '</div></div>';
+
+  const senses=s.senses.map((x,j)=>{ const k=s.id+":"+j;
+    return '<div class="pc-sense'+(p.open[k]?' open':'')+'" data-pcj="'+j+'"><button type="button"><span class="pc-ic">'+PC_ICONS[x.k]+'</span>'
+      + '<span class="pc-t"><strong>'+esc(x.n)+'</strong><span>'+esc(x.what)+'</span></span>'+PC_CHEV+'</button>'
+      + '<div class="pc-body"><ul>'+x.do.map(d=>'<li>'+esc(d)+'</li>').join('')+'</ul></div></div>'; }).join('');
+  const todo=s.todo.map((t,j)=>{ const k=s.id+":"+j;
+    return '<li><label><input type="checkbox" data-pck="'+k+'"'+(p.done[k]?' checked':'')+'><span class="pc-box">'+PC_CHECK+'</span><span class="pc-tx">'+esc(t)+'</span></label></li>'; }).join('');
+
+  h+='<div class="pc-panel" style="--c:'+s.color+'"><div class="pc-head"><div class="a">'+esc(s.age)+'</div><h2>'+esc(s.title)+'</h2><p>'+esc(s.intro)+'</p></div>'
+   + '<div class="pc-prog"><div class="pc-bar"><i style="width:'+pct+'%"></i></div><b>'+pct+'% fatto</b></div>'
+   + '<div class="pc-tabs"><button type="button" data-pct="senses" class="'+(p.tab==="senses"?"on":"")+'">Sensi e attività</button>'
+   + '<button type="button" data-pct="todo" class="'+(p.tab==="todo"?"on":"")+'">Da fare</button></div>'
+   + '<div class="pc-view">'+(p.tab==="todo" ? '<ul class="pc-check">'+todo+'</ul>' : senses)+'</div></div>';
+
+  h+='<details class="pc-rule"><summary>Regole che valgono sempre</summary><ul>'
+   + '<li>Sessioni brevi: 2–5 minuti nei primi mesi, 10–15 dopo i 6 mesi, sempre da sveglio e calmo.</li>'
+   + '<li>Fermarsi ai segnali di saturazione: sguardo che si gira, sbadiglio, singhiozzo, pianto, irrigidimento.</li>'
+   + '<li>Un senso alla volta all\'inizio, più sensi insieme dopo i 4 mesi.</li>'
+   + '<li>La voce e il volto dei genitori restano lo stimolo più efficace per tutto l\'anno.</li>'
+   + '<li>Nessuno schermo prima dei 24 mesi.</li>'
+   + '<li>Sonno sulla schiena, superficie rigida, niente oggetti nella culla. Tummy time solo da sveglio e sorvegliato.</li>'
+   + '<li>In bocca: nessun pezzo sotto i 4 cm, nessun cordino oltre i 20 cm. Niente oli essenziali nei primi 3 mesi.</li>'
+   + '</ul></details>';
+  h+='<details class="pc-rule"><summary>Segnali da monitorare</summary>'
+   + '<p>Uno scarto di 2–4 settimane è normale. Vale la pena parlarne al bilancio di salute se a fine fascia manca uno di questi punti.</p>'
+   + '<div class="pc-scroll"><table>'
+   + '<tr><td>2 mesi</td><td>Reagisce ai suoni forti; fissa il volto; sorriso sociale</td></tr>'
+   + '<tr><td>4 mesi</td><td>Segue a 180°; tiene la testa dritta; vocalizza; mani alla bocca</td></tr>'
+   + '<tr><td>6 mesi</td><td>Afferra; rotola; risponde al nome; ride</td></tr>'
+   + '<tr><td>9 mesi</td><td>Seduto senza appoggio; passa oggetti tra le mani; balbetta a sillabe; cerca l\'oggetto nascosto</td></tr>'
+   + '<tr><td>12 mesi</td><td>Si tira in piedi; usa la pinza; indica; almeno una parola; saluta con la mano</td></tr>'
+   + '</table></div><ul><li>Da riferire subito a qualsiasi età: perdita di una capacità acquisita, uso costante di un solo lato, nessuna reazione ai suoni, nessun contatto visivo.</li></ul></details>';
+  h+='<p class="pc-note">Contenuto di carattere generale, non sostituisce il pediatra. Le settimane si contano dalla nascita; per un nato prematuro, dalla data presunta del parto.</p>';
+
+  v.innerHTML=h;
+  v.querySelectorAll("[data-pcs]").forEach(b=> b.onclick=()=>{ p.sel=+b.dataset.pcs; p.manual=true; save(); renderPercorso(); });
+  v.querySelectorAll("[data-pct]").forEach(b=> b.onclick=()=>{ p.tab=b.dataset.pct; save(); renderPercorso(); });
+  v.querySelectorAll(".pc-sense>button").forEach(b=> b.onclick=()=>{ const k=s.id+":"+b.parentElement.dataset.pcj; p.open[k]=!p.open[k]; save(); renderPercorso(); });
+  v.querySelectorAll("[data-pck]").forEach(c=> c.onchange=()=>{ p.done[c.dataset.pck]=c.checked; save(); renderPercorso(); });
+}
+
 function render(){
   if(activeMacro==="bebe") renderBebe();
   else if(activeMacro==="fare") renderFare();
+  else if(activeMacro==="percorso") renderPercorso();
   else renderListe();
   const t=state.events.filter(e=>dayKey(e.at)===dayKey(Date.now()));
   fillBirth();
   document.getElementById("sub").textContent =
     activeMacro==="bebe" ? (t.length? "Oggi: "+t.filter(e=>e.type==="feed").length+" poppate · "+t.filter(e=>e.type==="diaper").length+" cambi" : "Il diario del bebè")
-    : activeMacro==="fare" ? "Compiti di Fede e Sara" : "Cosa serve al nido";
+    : activeMacro==="fare" ? "Compiti di Fede e Sara"
+    : activeMacro==="percorso" ? "Percorso sensoriale dei primi 12 mesi" : "Cosa serve al nido";
 }
 document.getElementById("scrim").onclick=(e)=>{ if(e.target.id==="scrim") closeSheet(); };
 
