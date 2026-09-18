@@ -1177,9 +1177,15 @@ function etaTesto(){
   const g=Math.floor((Date.now()-NASCITA.ms)/86400000);
   if(g<0) return "";
   if(g===0) return "oggi";
-  if(g<14) return g+(g===1?" giorno":" giorni");
-  if(g<70){ const w=Math.floor(g/7); return w+(w===1?" settimana":" settimane"); }
-  const m=Math.floor(g/30.44); return m+(m===1?" mese":" mesi");
+  if(g<7) return g+(g===1?" giorno":" giorni");
+  if(g<70){                                   // settimane + giorni: "2 settimane e 6 giorni"
+    const w=Math.floor(g/7), r=g%7;
+    const ws=w+(w===1?" settimana":" settimane");
+    return r ? ws+" e "+r+(r===1?" giorno":" giorni") : ws;
+  }
+  const m=Math.floor(g/30.44), rd=Math.floor(g-m*30.44);   // mesi + giorni
+  const ms=m+(m===1?" mese":" mesi");
+  return rd ? ms+" e "+rd+(rd===1?" giorno":" giorni") : ms;
 }
 function fillBirth(){
   const a=document.getElementById("age");
