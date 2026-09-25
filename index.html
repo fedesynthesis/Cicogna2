@@ -1410,6 +1410,33 @@ async function cloudPush(){
 function flushCloudPush(){ if(!fbReady) return; if(pushTimer){ clearTimeout(pushTimer); pushTimer=null; } if(dirty && !pendingWrite) cloudPush(); }
 document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="hidden") flushCloudPush(); });
 window.addEventListener("pagehide", flushCloudPush);
+
+/* Applica lo stato del server fondendolo col locale (union + tombstone). Usato sia
+   dall'ascoltatore in tempo reale sia dalla ri-lettura alla riapertura. */
+function applyServerData(data){
+  if(!data){ cloudPush(); return; }
+  const m = mergeUnion(state, data);
+  SYNC_KEYS.forEach(k=> state[k]=m[k]);
+  try{ localStorage.setItem(KEY,JSON.stringify(state)); }catch(e){}
+  if(needsPush(m, data)) scheduleCloudPush();   // propaga mie aggiunte/cancellazioni
+}
+/* Ri-lettura FORZATA dal server ad ogni riapertura dell'app: in background iOS
+   sospende l'ascoltatore in tempo reale e alla riapertura può non consegnare subito
+   le modifiche dell'altro telefono → qui le tiro giù attivamente dal server. */
+async function pullNow(){
+  if(!fbReady || pendingWrite || document.visibilityState!=="visible") return;
+  try{
+    let snap;
+    try{ snap = await FB.getDocFromServer(fdoc); }   // forza il server
+    catch(e){ snap = await FB.getDoc(fdoc); }          // offline: ripiego sulla cache
+    const data = snap.exists() ? snap.data() : null;
+    applyServerData(data);
+    localStorage.setItem(SYNC_INIT,"1");
+    conservaCampi(render);
+  }catch(e){ console.warn("pullNow", e); }
+}
+document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible") pullNow(); });
+window.addEventListener("pageshow", pullNow);
 function mergeUnion(local, server){
   const out={};
   // 1) fondo i tombstone (id cancellati) di entrambi, tengo il timestamp più recente,
@@ -1475,18 +1502,7 @@ async function initSync(){
         if(snap.metadata.fromCache){ setConn("wait","Offline · solo questo telefono"); return; }
         setConn("on","Sincronizzato ✓");
         const data = snap.exists() ? snap.data() : null;
-        if(!data){ cloudPush(); }
-        else {
-          // FONDO SEMPRE locale + server (union per id + tombstone). Applico anche
-          // mentre sto scrivendo: la fusione tiene le mie modifiche in corso, quindi
-          // gli aggiornamenti dell'altro telefono compaiono SUBITO (niente più attesa).
-          const m = mergeUnion(state, data);
-          SYNC_KEYS.forEach(k=> state[k]=m[k]);
-          try{ localStorage.setItem(KEY,JSON.stringify(state)); }catch(e){}
-          // Ripubblico solo se ho aggiunte/cancellazioni che il server non ha ancora
-          // (propaga anche le cancellazioni). Basato su insiemi → converge, niente loop.
-          if(needsPush(m, data)) scheduleCloudPush();
-        }
+        applyServerData(data);   // fonde sempre locale + server (union + tombstone)
         localStorage.setItem(SYNC_INIT,"1");
         conservaCampi(render);   // non cancellare quello che si sta scrivendo
       },
