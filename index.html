@@ -277,6 +277,15 @@
   .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
   .note{text-align:center;color:var(--ink-soft);font-size:12.5px;padding:22px 10px 10px;line-height:1.6}
 
+  /* ===== Boost: micro-interazioni (solo estetica, nessuna logica cambiata) ===== */
+  .scheda,.macro button,.cb,.pc-stage{transition:transform .12s cubic-bezier(.34,1.6,.5,1)}
+  .scheda:active,.macro button:active,.cb:active,.pc-stage:active{transform:scale(.93)}
+  .pc-marker::after{content:"";position:absolute;inset:-6px;border-radius:50%;border:2px solid var(--sage);
+    opacity:0;animation:nidoPing 2.6s ease-out infinite}
+  @keyframes nidoPing{0%{opacity:.5;transform:scale(.6)}70%,100%{opacity:0;transform:scale(1.6)}}
+  .nido-conf{position:fixed;width:9px;height:9px;border-radius:2px;pointer-events:none;z-index:600;will-change:transform}
+  @media (prefers-reduced-motion:reduce){ .pc-marker::after{animation:none} }
+
   /* ===== Percorso sensoriale 0–12 mesi (classi pc- per non collidere) ===== */
   .pc-timeline{margin:2px 0 16px}
   .pc-track{position:relative;height:12px;border-radius:99px;overflow:hidden;display:flex;background:var(--line)}
@@ -466,6 +475,25 @@ state.weighDone= state.weighDone|| [];  // chiavi promemoria pesata archiviati
 let activeMacro = "bebe", editMode = false, taskWho = "tutti";
 
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+/* Boost: piccolo festeggiamento di coriandoli (rispetta "riduci movimento") */
+const NIDO_CONF=['#4fa269','#f4cd78','#ef9a85','#8ec5e8','#c3aedd'];
+function nidoConfetti(x,y,n){
+  try{ if(matchMedia('(prefers-reduced-motion: reduce)').matches) return; }catch(e){}
+  n=n||16;
+  for(let i=0;i<n;i++){
+    const p=document.createElement('div'); p.className='nido-conf';
+    p.style.background=NIDO_CONF[i%NIDO_CONF.length];
+    if(i%3===0) p.style.borderRadius='50%';
+    p.style.left=x+'px'; p.style.top=y+'px';
+    document.body.appendChild(p);
+    const a=Math.random()*Math.PI*2, d=42+Math.random()*72;
+    const dx=Math.cos(a)*d, dy=Math.sin(a)*d-28-Math.random()*40;
+    p.animate([{transform:'translate(0,0) rotate(0)',opacity:1},
+      {transform:'translate('+dx+'px,'+(dy+96)+'px) rotate('+((Math.random()*2-1)*440)+'deg)',opacity:0}],
+      {duration:760+Math.random()*340,easing:'cubic-bezier(.2,.6,.3,1)'}).onfinish=()=>p.remove();
+  }
+}
+function nidoConfettiAt(el,n){ if(!el)return; const r=el.getBoundingClientRect(); nidoConfetti(r.left+r.width/2, r.top+r.height/2, n); }
 function toast(msg){ const t=document.getElementById("toast"); t.textContent=msg; t.classList.add("on"); setTimeout(()=>t.classList.remove("on"),1700); }
 
 /* ============ Date ============ */
@@ -853,7 +881,7 @@ function renderFare(){
   v.innerHTML=h;
 
   tapSubito(v.querySelector("#taddbtn"), ()=>openTask());
-  v.querySelectorAll("[data-tg]").forEach(b=> b.onclick=()=>{ const t=state.tasks.find(x=>x.id===b.dataset.tg); if(t){ t.done=!t.done; save(); render(); } });
+  v.querySelectorAll("[data-tg]").forEach(b=> b.onclick=()=>{ const t=state.tasks.find(x=>x.id===b.dataset.tg); if(t){ const was=t.done; t.done=!t.done; if(t.done&&!was) nidoConfettiAt(b,16); save(); render(); } });
   v.querySelectorAll("[data-tdel]").forEach(b=> b.onclick=(e)=>{ e.stopPropagation(); const id=b.dataset.tdel;
     askConfirm("Vuoi eliminare questo compito?", ()=>{ tomb(id); state.tasks=state.tasks.filter(x=>x.id!==id); save(); render(); }); });
   v.querySelectorAll("[data-tedit]").forEach(el=> tapSubito(el, ()=> openTask(el.dataset.tedit)));
@@ -1333,7 +1361,9 @@ function renderPercorso(){
   v.querySelectorAll("[data-pcs]").forEach(b=> b.onclick=()=>{ p.sel=+b.dataset.pcs; p.manual=true; save(); renderPercorso(); });
   v.querySelectorAll("[data-pct]").forEach(b=> b.onclick=()=>{ p.tab=b.dataset.pct; save(); renderPercorso(); });
   v.querySelectorAll(".pc-sense>button").forEach(b=> b.onclick=()=>{ const k=s.id+":"+b.parentElement.dataset.pcj; p.open[k]=!p.open[k]; save(); renderPercorso(); });
-  v.querySelectorAll("[data-pck]").forEach(c=> c.onchange=()=>{ p.done[c.dataset.pck]=c.checked; save(); renderPercorso(); });
+  v.querySelectorAll("[data-pck]").forEach(c=> c.onchange=()=>{ p.done[c.dataset.pck]=c.checked;
+    if(c.checked){ nidoConfettiAt(c.nextElementSibling||c, 16); if(pcPct(p.sel)===100) nidoConfetti(innerWidth/2, innerHeight*0.42, 46); }
+    save(); renderPercorso(); });
 }
 
 function render(){
