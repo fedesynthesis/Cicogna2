@@ -263,6 +263,11 @@
   .opts button{flex:1;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);
     font-family:'Quicksand';font-weight:600;font-size:14.5px;padding:13px 8px;border-radius:15px;cursor:pointer}
   .opts button.on{background:var(--sage);border-color:var(--sage);color:#fff}
+  .colgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:9px}
+  .colgrid button{height:40px;border:2.5px solid transparent;border-radius:13px;cursor:pointer;padding:0;
+    transition:transform .12s cubic-bezier(.34,1.6,.5,1)}
+  .colgrid button:active{transform:scale(.88)}
+  .colgrid button.on{box-shadow:0 0 0 2px var(--surface) inset,var(--shadow-soft)}
   .fld{display:flex;align-items:center;gap:10px;border:1.5px solid var(--line);border-radius:15px;padding:0 14px;background:var(--bg)}
   .fld input{flex:1;border:none;background:none;outline:none;padding:13px 0;font-family:'Inter';font-size:16px;color:var(--ink)}
   .fld .u{color:var(--ink-soft);font-size:14px}
@@ -1111,7 +1116,26 @@ function openReorder(){
 }
 
 /* ---- Nuova scheda personalizzata (categoria bebè) ---- */
-const TAB_COLORS=[["#d2ebd9","#2f7247"],["#f6e6bb","#7c6210"],["#f1dbc6","#8a5a2c"],["#d3e3f1","#3c6a8e"],["#ecd7ea","#874669"],["#d4e8e4","#2f736a"]];
+const TAB_COLORS=[
+  ["#d2ebd9","#2f7247"], // verde
+  ["#cdeae4","#23786d"], // verde acqua
+  ["#d4e8e4","#2f736a"], // teal
+  ["#cfe8ef","#2c7285"], // ciano
+  ["#d3e3f1","#3c6a8e"], // azzurro
+  ["#dbdcf3","#4a4d97"], // pervinca
+  ["#e2d6f2","#6a4a9c"], // viola
+  ["#ecd7ea","#874669"], // malva
+  ["#f6dbe0","#9c4f66"], // rosa
+  ["#f5d6cf","#a24b3c"], // corallo
+  ["#f1dbc6","#8a5a2c"], // pesca
+  ["#f6e6bb","#7c6210"], // burro
+  ["#eef0cb","#6f7a1f"], // lime tenue
+  ["#e2ead0","#5a6b3a"], // salvia chiara
+  ["#e8ddc9","#7a5f34"], // sabbia
+  ["#e6e0da","#6b5e52"], // taupe
+  ["#dde3e6","#4c5b63"], // ardesia
+  ["#e9e2ee","#6c5c7d"]  // grigio-lilla
+];
 const TAB_ICONS=["💊","🌡️","🛁","💤","🍼","🧴","💉","🩺","🦷","🧷","💩","💧","🤮","🩹","👶","🚼","🧸","📏","🥄","🍎","☀️","🌙","❤️","⭐","🌿","🧦","👕","🚽"];
 let newTabColor=0, newTabEmoji="💊";
 function openNewTab(){
@@ -1123,8 +1147,8 @@ function openNewTab(){
     + '<div class="lbl">Icona</div><div class="icgrid" id="ntico">'
       + TAB_ICONS.map(e=>'<button data-e="'+e+'" class="'+(e===newTabEmoji?"on":"")+'">'+e+'</button>').join("")
     + '</div>'
-    + '<div class="lbl">Colore</div><div class="opts" id="ntcol">'
-      + TAB_COLORS.map((c,i)=>'<button data-c="'+i+'" class="'+(i===0?"on":"")+'" style="background:'+c[0]+';border-color:'+(i===0?c[1]:"transparent")+';color:'+c[1]+';font-size:18px">●</button>').join("")
+    + '<div class="lbl">Colore</div><div class="colgrid" id="ntcol">'
+      + TAB_COLORS.map((c,i)=>'<button type="button" data-c="'+i+'" class="'+(i===0?"on":"")+'" aria-label="Colore '+(i+1)+'" style="background:'+c[0]+';border-color:'+(i===0?c[1]:"transparent")+'"></button>').join("")
     + '</div>'
     + '<button class="go" id="ntgo">Crea scheda</button>'
     + '<button class="cancel" id="ntcancel">Annulla</button>';
