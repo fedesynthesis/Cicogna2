@@ -551,12 +551,12 @@ function openEvent(type, id, catId){
   if(e){
     const d=new Date(e.at);
     draft={ id:e.id, type:e.type, catId:e.catId||null, kind:e.kind||"pipi", mode:e.mode||"seno", side:e.side||"sx",
-            amount:e.amount||null, stato:e.stato||null, min:e.min||"", ml:e.ml||"", note:e.note||"",
+            amount:e.amount||null, stato:e.stato||null, dove:e.dove||null, min:e.min||"", ml:e.ml||"", note:e.note||"",
             date: d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"),
             time: String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0") };
   } else {
     draft={ type:type, catId:catId||null, kind:"pipi", mode:"seno", side:"sx", date:n.date, time:n.time,
-            note:(catId==="vitd"?"4 gocce":"") };
+            stato:(type==="bath"?"totale":null), dove:null, note:(catId==="vitd"?"4 gocce":"") };
   }
   renderSheetEvent();
   document.getElementById("scrim").classList.add("on");
@@ -566,8 +566,8 @@ function closeSheet(){ document.getElementById("scrim").classList.remove("on"); 
 function renderSheetEvent(){
   const f=draft, s=document.getElementById("sheet");
   const cTab = f.type==="custom" ? ((state.customTabs||[]).find(t=>t.id===f.catId)||{name:"Scheda"}) : null;
-  const titolo = (f.id?"Modifica ":"") + (f.type==="diaper" ? "cambio" : f.type==="feed" ? "poppata" : f.type==="cord" ? "medicazione" : f.type==="custom" ? (cTab.name||"voce").toLowerCase() : "vomito");
-  const hint   = f.type==="diaper" ? "Cosa ha fatto" : f.type==="feed" ? "Come ha mangiato" : f.type==="cord" ? "Cordone ombelicale" : f.type==="custom" ? "Quando è stato" : "Quando è successo";
+  const titolo = (f.id?"Modifica ":"") + (f.type==="diaper" ? "cambio" : f.type==="feed" ? "poppata" : f.type==="cord" ? "medicazione" : f.type==="bath" ? "bagnetto" : f.type==="custom" ? (cTab.name||"voce").toLowerCase() : "vomito");
+  const hint   = f.type==="diaper" ? "Cosa ha fatto" : f.type==="feed" ? "Come ha mangiato" : f.type==="cord" ? "Cordone ombelicale" : f.type==="bath" ? "Totale nella vaschetta, o parziale a pezzi" : f.type==="custom" ? "Quando è stato" : "Quando è successo";
 
   let campi="";
   if(f.type==="diaper"){
@@ -596,6 +596,15 @@ function renderSheetEvent(){
       + '<button data-c="arrossato" class="'+(f.stato==="arrossato"?"on":"")+'">Arrossato</button></div>'
       + '<div class="opts" style="margin-top:8px" id="cst2">'
       + '<button data-c="caduto" class="'+(f.stato==="caduto"?"on":"")+'">🎉 È caduto</button></div>';
+  } else if(f.type==="bath"){
+    campi = '<div class="lbl">Tipo</div><div class="opts" id="bkind">'
+      + '<button data-b="totale" class="'+(f.stato==="totale"?"on":"")+'">🛁 Totale · vaschetta</button>'
+      + '<button data-b="parziale" class="'+(f.stato==="parziale"?"on":"")+'">🧽 Parziale · a pezzi</button></div>'
+      + (f.stato==="parziale"
+          ? '<div class="lbl">Dove</div><div class="opts" id="bdove">'
+            + '<button data-d="lavandino" class="'+(f.dove==="lavandino"?"on":"")+'">🚰 Lavandino</button>'
+            + '<button data-d="fasciatoio" class="'+(f.dove==="fasciatoio"?"on":"")+'">🧷 Fasciatoio</button></div>'
+          : '');
   } else if(f.type==="custom"){
     campi = "";
   } else {
@@ -620,6 +629,8 @@ function renderSheetEvent(){
   const fs=s.querySelector("#fside");  if(fs) fs.querySelectorAll("button").forEach(b=> b.onclick=()=>{ keep(); draft.side=b.dataset.s; renderSheetEvent(); });
   const va=s.querySelector("#vamt");   if(va) va.querySelectorAll("button").forEach(b=> b.onclick=()=>{ keep(); draft.amount=b.dataset.v; renderSheetEvent(); });
   ["#cst","#cst2"].forEach(sel=>{ const g=s.querySelector(sel); if(g) g.querySelectorAll("button").forEach(b=> b.onclick=()=>{ keep(); draft.stato=b.dataset.c; renderSheetEvent(); }); });
+  const bk=s.querySelector("#bkind"); if(bk) bk.querySelectorAll("button").forEach(b=> b.onclick=()=>{ keep(); draft.stato=b.dataset.b; if(draft.stato!=="parziale") draft.dove=null; renderSheetEvent(); });
+  const bd=s.querySelector("#bdove"); if(bd) bd.querySelectorAll("button").forEach(b=> b.onclick=()=>{ keep(); draft.dove=b.dataset.d; renderSheetEvent(); });
 
   s.querySelector("#ego").onclick=()=>{
     keep();
@@ -635,6 +646,7 @@ function renderSheetEvent(){
       ev.ml=ml?(parseInt(ml.value,10)||null):null;
       if(cosa && cosa.value.trim()) ev.note=cosa.value.trim();
     } else if(draft.type==="cord"){ ev.stato=draft.stato||null; }
+    else if(draft.type==="bath"){ ev.stato=draft.stato||"totale"; ev.dove=(ev.stato==="parziale")?(draft.dove||null):null; }
     else if(draft.type==="custom"){ ev.catId=draft.catId||null; }
     else { ev.amount=draft.amount||null; }
     const modifica = !!draft.id;
@@ -693,6 +705,7 @@ function renderBebe(){
   const nFeed=todays.filter(e=>e.type==="feed").length;
   const nVomit=todays.filter(e=>e.type==="vomit").length;
   const nCord=todays.filter(e=>e.type==="cord").length;
+  const nBath=todays.filter(e=>e.type==="bath").length;
   const w=state.weights.slice().sort((a,b)=>b.at-a.at);
 
   const custom = (state.customTabs||[]).filter(t=> !t.from || today>=t.from).map(t=>({
@@ -710,6 +723,8 @@ function renderBebe(){
       bg:"#f6e6bb", fg:"#7c6210" },
     { k:"cord",   emoji:"🩹", titolo:"Cordone", oggi:nCord,   righe:ev.filter(e=>e.type==="cord"),
       bg:"#ddd3ef", fg:"#574685" },
+    { k:"bath",   emoji:"🛁", titolo:"Bagnetto", oggi:nBath,  righe:ev.filter(e=>e.type==="bath"),
+      bg:"#cfe8ef", fg:"#2c7285" },
     ...custom,
     { k:"weight", emoji:"⚖️", titolo:"Peso",    oggi:null,    righe:w,
       bg:"#d3e3f1", fg:"#3c6a8e" }
@@ -774,6 +789,7 @@ function renderBebe(){
         if(e.type==="feed")       tit=(e.mode==="seno"?"🤱 ":e.mode==="biberon"?"🍼 ":"🥄 ")+feedText(e);
         else if(e.type==="vomit") tit="Vomito"+(e.amount?" · "+e.amount:"");
         else if(e.type==="cord") tit=(e.stato==="caduto"?"🎉 Cordone caduto":"Medicazione"+(e.stato?" · "+e.stato:""));
+        else if(e.type==="bath") tit=(e.stato==="parziale"?"🧽 Parziale"+(e.dove?" · "+e.dove:""):"🛁 Totale · vaschetta");
         else if(e.type==="custom") tit=(e.note?e.note:"Registrato");
         else                      tit=(KINDS[e.kind]||KINDS.pipi).e+" "+(KINDS[e.kind]||KINDS.pipi).t;
         h += '<div class="ev tocca" data-edit="'+e.id+'"><div class="dot">'+dayShort(e.at)+'</div>'
@@ -1079,7 +1095,8 @@ function currentTabList(){
     {k:"feed",emoji:"🍼",name:"Poppata"},
     {k:"vomit",emoji:"🤢",name:"Vomito"},
     {k:"diaper",emoji:"🧷",name:"Cambio"},
-    {k:"cord",emoji:"🩹",name:"Cordone"}
+    {k:"cord",emoji:"🩹",name:"Cordone"},
+    {k:"bath",emoji:"🛁",name:"Bagnetto"}
   ];
   (state.customTabs||[]).filter(t=> !t.from || today>=t.from).forEach(t=> list.push({k:"c_"+t.id, emoji:t.emoji||"⭐", name:t.name||"Scheda"}));
   list.push({k:"weight",emoji:"⚖️",name:"Peso"});
