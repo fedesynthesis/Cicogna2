@@ -1736,15 +1736,17 @@ const CH_SERIES=[
   {k:"diaper", nome:"Cambi",   col:"#c39a1f", axis:"count"},
   {k:"vomit",  nome:"Vomito",  col:"#8a5a2c", axis:"count"},
   {k:"cord",   nome:"Cordone", col:"#574685", axis:"count"},
-  {k:"weight", nome:"Peso",    col:"#3c6a8e", axis:"kg"}
+  {k:"weight", nome:"Peso",    col:"#3c6a8e", axis:"kg"},
+  {k:"length", nome:"Altezza", col:"#2f736a", axis:"cm"}
 ];
-let chartVisible={feed:true, diaper:true, vomit:false, cord:false, weight:true};
+let chartVisible={feed:true, diaper:true, vomit:false, cord:false, weight:true, length:true};
 let chartPeriod="14";
 
 function chDays(period){
   const now=Date.now(); const oggi=dayKey(now);
   // ultimo giorno = oggi o l'ultima data con dati
   let all=[]; (state.events||[]).forEach(e=>all.push(e.at)); (state.weights||[]).forEach(w=>all.push(w.at));
+  if(NASCITA && NASCITA.ms) all.push(NASCITA.ms);   // la nascita è l'inizio della storia
   const maxMs = all.length ? Math.max(now, Math.max.apply(null,all)) : now;
   let n = period==="7"?7 : period==="14"?14 : period==="30"?30 : 0;
   let minMs;
@@ -1757,6 +1759,13 @@ function chDays(period){
   return days;
 }
 function chDataFor(k, days){
+  if(k==="length"){
+    // misure (cm) per giorno, media se più d'una; + lunghezza alla nascita come primo punto
+    const byDay={};
+    (state.events||[]).filter(e=>e.type==="length"&&e.cm!=null).forEach(e=>{ const key=dayKey(e.at); (byDay[key]=byDay[key]||[]).push(e.cm); });
+    const bk=dayKey(NASCITA.ms); if(NASCITA.cm && !byDay[bk]) byDay[bk]=[NASCITA.cm];
+    return days.map(key=> byDay[key] ? {v: byDay[key].reduce((a,b)=>a+b,0)/byDay[key].length} : null);
+  }
   if(k==="weight"){
     // punti reali (kg) sui giorni in cui c'è una pesata; media se più d'una
     const byDay={};
@@ -1790,6 +1799,14 @@ function buildChartSVG(){
   const pad=(wMax-wMin)*0.15; wMin-=pad; wMax+=pad;
   const Yw=(v)=> padT + plotH - ((v-wMin)/(wMax-wMin))*plotH;
 
+  // scala altezza (cm) — scala propria, valori mostrati come etichette sui punti
+  const lPts=chDataFor("length",days).map((p,i)=>p?{i,v:p.v}:null).filter(Boolean);
+  let lMin=Infinity, lMax=-Infinity; lPts.forEach(p=>{ lMin=Math.min(lMin,p.v); lMax=Math.max(lMax,p.v); });
+  if(!isFinite(lMin)){ lMin=0; lMax=1; }
+  if(lMin===lMax){ lMin-=1; lMax+=1; }
+  const lp=(lMax-lMin)*0.18; lMin-=lp; lMax+=lp;
+  const Yl=(v)=> padT + plotH - ((v-lMin)/(lMax-lMin))*plotH;
+
   let g='';
   // griglia orizzontale + asse conteggi
   const steps=Math.min(maxCount,4);
@@ -1815,13 +1832,18 @@ function buildChartSVG(){
     if(!chartVisible[sr.k]) return;
     const data=chDataFor(sr.k,days);
     const pts=[];
-    data.forEach((p,i)=>{ if(p==null) return; const y= sr.axis==="kg"?Yw(p.v):Yc(p.v); pts.push([X(i),y,p.v]); });
+    data.forEach((p,i)=>{ if(p==null) return; const y= sr.axis==="kg"?Yw(p.v): sr.axis==="cm"?Yl(p.v) :Yc(p.v); pts.push([X(i),y,p.v]); });
     if(!pts.length) return;
     if(pts.length>1){
       g+='<polyline fill="none" stroke="'+sr.col+'" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" points="'
          + pts.map(p=>p[0].toFixed(1)+","+p[1].toFixed(1)).join(" ")+'"/>';
     }
-    pts.forEach(p=>{ g+='<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="'+(sr.axis==="kg"?3:2.6)+'" fill="'+sr.col+'"/>'; });
+    pts.forEach(p=>{ g+='<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="'+(sr.axis==="count"?2.6:3)+'" fill="'+sr.col+'"/>'; });
+    if(sr.axis==="cm"){   // mostro il valore in cm sopra (o sotto) ogni punto
+      pts.forEach(p=>{ const lab=(Math.round(p[2]*10)/10+"").replace(".",",");
+        const up = p[1]>padT+14; const ly = up ? p[1]-6 : p[1]+12;
+        g+='<text x="'+p[0].toFixed(1)+'" y="'+ly.toFixed(1)+'" text-anchor="middle" font-size="8.5" font-weight="700" fill="'+sr.col+'">'+lab+'</text>'; });
+    }
   });
   return '<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg">'+g+'</svg>';
 }
