@@ -530,7 +530,7 @@ function buildMacro(){
     const b=document.createElement("button");
     b.className = m.id===activeMacro ? "active" : "";
     b.textContent=m.label;
-    b.onclick=()=>{ activeMacro=m.id; editMode=false; buildMacro(); render(); };
+    b.onclick=()=>{ if(m.id==="percorso" && state.percorso) state.percorso.manual=false; activeMacro=m.id; editMode=false; buildMacro(); render(); };
     el.appendChild(b);
   });
 }
@@ -1375,7 +1375,10 @@ function pcPct(i){ const s=PC_STAGES[i], p=pcS(); const d=s.todo.filter((_,j)=>p
 function renderPercorso(){
   const v=document.getElementById("view"), p=pcS(), days=pcAgeDays();
   // la tappa si posiziona da sola sull'età, finché non ne scegli una a mano
-  if(days>=0 && !p.manual){ const cur=PC_STAGES.findIndex(s=>days>=s.from&&days<s.to); if(cur>=0) p.sel=cur; }
+  const cur = days>=0 ? PC_STAGES.findIndex(s=>days>=s.from&&days<s.to) : -1;
+  // il tempo è entrato in una nuova tappa → aggancia automaticamente (anche se stavi sfogliando)
+  if(cur>=0 && p.autoStage!==cur){ p.autoStage=cur; p.manual=false; }
+  if(cur>=0 && !p.manual){ p.sel=cur; }
   if(p.sel<0||p.sel>=PC_STAGES.length) p.sel=0;
   const s=PC_STAGES[p.sel], pct=pcPct(p.sel);
 
