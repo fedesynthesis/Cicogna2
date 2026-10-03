@@ -1382,10 +1382,18 @@ function renderPercorso(){
   if(p.sel<0||p.sel>=PC_STAGES.length) p.sel=0;
   const s=PC_STAGES[p.sel], pct=pcPct(p.sel);
 
+  // posizione del pallino: allineata agli SPICCHII (ogni tappa = 1/6 della barra),
+  // con avanzamento proporzionale dentro la tappa corrente — così sta sopra la tappa giusta
+  let markerPos=0, markerShow=days>=0;
+  if(days>=0){
+    if(cur>=0){ const cs=PC_STAGES[cur]; const frac=Math.max(0,Math.min(1,(days-cs.from)/(cs.to-cs.from))); markerPos=(cur+frac)/PC_STAGES.length*100; }
+    else { markerPos = days>=PC_STAGES[PC_STAGES.length-1].to ? 99 : 0; }   // oltre i 12 mesi → fondo barra
+  }
+
   let h='<div class="pc-timeline"><div class="pc-track">'
     + PC_STAGES.map(x=>'<span style="background:'+x.color+'"'+(days>=x.to?' class="past"':'')+'></span>').join('')
     + '</div><div class="pc-markwrap">'
-    + (days>=0 ? '<div class="pc-marker" style="left:'+(Math.min(days,365)/365*100)+'%"></div>' : '')
+    + (markerShow ? '<div class="pc-marker" style="left:'+markerPos+'%"></div>' : '')
     + '</div><div class="pc-stages">'
     + PC_STAGES.map((x,i)=>'<button type="button" class="pc-stage'+(i===p.sel?' on':'')+'" style="--c:'+x.color+'" data-pcs="'+i+'"><span class="d"></span><span class="l">'+x.short+'</span><span class="p">'+pcPct(i)+'%</span></button>').join('')
     + '</div></div>';
