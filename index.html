@@ -663,7 +663,7 @@ function renderSheetEvent(){
     if(ev.type==="length" && ev.cm==null){ toast("Scrivi l'altezza in cm"); return; }
     const modifica = !!draft.id;
     if(modifica){ ev.id=draft.id; state.events=state.events.map(x=> x.id===draft.id ? ev : x); }
-    else state.events.unshift(ev);
+    else { state.events.unshift(ev); cloudFastAdd("events", ev); }
     state.events.sort((a,b)=>b.at-a.at);
     save(); closeSheet(); render();
     toast(modifica ? "Modifica salvata" : (ev.type==="diaper" ? "Cambio registrato" : ev.type==="feed" ? "Poppata registrata" : "Registrato"));
@@ -827,7 +827,7 @@ function renderBebe(){
     const today=dayKey(Date.now());
     if(b.dataset.vit==="give"){
       if(!state.customTabs.some(t=>t.id==="vitd")) state.customTabs.push({id:"vitd", emoji:"💊", name:"Vitamina D", bg:"#ecd7ea", fg:"#874669", from:"2026-09-08"});
-      state.events.unshift({id:uid(), type:"custom", catId:"vitd", at:Date.now(), note:"4 gocce"}); state.events.sort((a,b)=>b.at-a.at); state.bebeTab="c_vitd"; toast("Aggiunta al foglio Vitamina D ✓");
+      const vev={id:uid(), type:"custom", catId:"vitd", at:Date.now(), note:"4 gocce"}; state.events.unshift(vev); cloudFastAdd("events", vev); state.events.sort((a,b)=>b.at-a.at); state.bebeTab="c_vitd"; toast("Aggiunta al foglio Vitamina D ✓");
     }
     else { state.events.filter(x=> x.type==="custom"&&x.catId==="vitd"&&dayKey(x.at)===today).forEach(x=>tomb(x.id)); state.events = state.events.filter(x=> !(x.type==="custom"&&x.catId==="vitd"&&dayKey(x.at)===today)); }
     save(); render();
@@ -892,7 +892,7 @@ function openWeight(id){
     const at=d ? new Date(d+"T12:00").getTime() : Date.now();
     const nota=s.querySelector("#wnote").value.trim();
     if(w0){ state.weights=state.weights.map(x=> x.id===w0.id ? {id:w0.id, kg:kg, at:at, note:nota} : x); }
-    else state.weights.unshift({id:uid(), kg:kg, at:at, note:nota});
+    else { const nw={id:uid(), kg:kg, at:at, note:nota}; state.weights.unshift(nw); cloudFastAdd("weights", nw); }
     state.weights.sort((a,b)=>b.at-a.at);
     save(); document.getElementById("scrim").classList.remove("on"); render(); toast(w0?"Modifica salvata":"Pesata registrata");
   };
@@ -1507,6 +1507,15 @@ async function cloudPush(){
   catch(e){ console.warn("push", e); dirty=true; }
   pendingWrite=false;
   if(dirty) scheduleCloudPush();                 // sono arrivate altre modifiche mentre scrivevo → ripubblico
+}
+/* Invio LAMPO della singola voce appena aggiunta: scrive solo quell'elemento sul
+   cloud (poche centinaia di byte con arrayUnion), non tutto il diario. Così la
+   scrittura fa in tempo a partire anche se blocchi il telefono subito dopo, e
+   l'altro telefono la vede senza aspettare la riapertura. (Il push completo
+   resta come riconciliazione per modifiche/cancellazioni.) */
+function cloudFastAdd(field, obj){
+  if(!fbReady || !fdb || !FB.updateDoc || !FB.arrayUnion) return;
+  try{ FB.updateDoc(fdoc, { [field]: FB.arrayUnion(obj) }); }catch(e){ console.warn("fastAdd", e); }
 }
 /* Flush immediato quando l'app va in background o viene chiusa: senza questo, se
    modifichi e chiudi subito, il push in coda (300ms) non parte e l'altro telefono
