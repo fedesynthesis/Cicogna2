@@ -663,7 +663,8 @@ function renderSheetEvent(){
     if(ev.type==="length" && ev.cm==null){ toast("Scrivi l'altezza in cm"); return; }
     const modifica = !!draft.id;
     if(modifica){ ev.id=draft.id; state.events=state.events.map(x=> x.id===draft.id ? ev : x); }
-    else { state.events.unshift(ev); cloudFastAdd("events", ev); }
+    else { state.events.unshift(ev); }
+    eventPush(ev);                       // scrive la singola schedina nella sottocollezione (aggiunta o modifica)
     state.events.sort((a,b)=>b.at-a.at);
     save(); closeSheet(); render();
     toast(modifica ? "Modifica salvata" : (ev.type==="diaper" ? "Cambio registrato" : ev.type==="feed" ? "Poppata registrata" : "Registrato"));
@@ -675,7 +676,7 @@ function feedText(e){
   if(e.mode==="biberon") return "Biberon"+(e.ml?" · "+e.ml+" ml":"");
   return "Solido"+(e.note?" · "+e.note:"");
 }
-function delEvent(id){ tomb(id); state.events=state.events.filter(e=>e.id!==id); save(); render(); }
+function delEvent(id){ tomb(id); eventRemove(id); state.events=state.events.filter(e=>e.id!==id); save(); render(); }
 
 /* ============ Promemoria (in-app, condivisi) ============ */
 const VITD_START="2026-09-08", VITD_END="2027-09-08";
@@ -827,9 +828,9 @@ function renderBebe(){
     const today=dayKey(Date.now());
     if(b.dataset.vit==="give"){
       if(!state.customTabs.some(t=>t.id==="vitd")) state.customTabs.push({id:"vitd", emoji:"💊", name:"Vitamina D", bg:"#ecd7ea", fg:"#874669", from:"2026-09-08"});
-      const vev={id:uid(), type:"custom", catId:"vitd", at:Date.now(), note:"4 gocce"}; state.events.unshift(vev); cloudFastAdd("events", vev); state.events.sort((a,b)=>b.at-a.at); state.bebeTab="c_vitd"; toast("Aggiunta al foglio Vitamina D ✓");
+      const vev={id:uid(), type:"custom", catId:"vitd", at:Date.now(), note:"4 gocce"}; state.events.unshift(vev); eventPush(vev); state.events.sort((a,b)=>b.at-a.at); state.bebeTab="c_vitd"; toast("Aggiunta al foglio Vitamina D ✓");
     }
-    else { state.events.filter(x=> x.type==="custom"&&x.catId==="vitd"&&dayKey(x.at)===today).forEach(x=>tomb(x.id)); state.events = state.events.filter(x=> !(x.type==="custom"&&x.catId==="vitd"&&dayKey(x.at)===today)); }
+    else { state.events.filter(x=> x.type==="custom"&&x.catId==="vitd"&&dayKey(x.at)===today).forEach(x=>{ tomb(x.id); eventRemove(x.id); }); state.events = state.events.filter(x=> !(x.type==="custom"&&x.catId==="vitd"&&dayKey(x.at)===today)); }
     save(); render();
   }));
   v.querySelectorAll("[data-weigh]").forEach(b=> tapSubito(b, (e)=>{ if(e&&e.stopPropagation) e.stopPropagation();
@@ -853,7 +854,7 @@ function renderBebe(){
   v.querySelectorAll("[data-tabdel]").forEach(b=> tapSubito(b, (e)=>{ if(e&&e.stopPropagation) e.stopPropagation();
     const catId=b.dataset.tabdel; const t=(state.customTabs||[]).find(x=>x.id===catId);
     askConfirm('Vuoi eliminare la scheda "'+((t&&t.name)||"")+'" e tutti i suoi eventi?', ()=>{
-      tomb(catId); state.events.filter(x=>x.type==="custom"&&x.catId===catId).forEach(x=>tomb(x.id));
+      tomb(catId); state.events.filter(x=>x.type==="custom"&&x.catId===catId).forEach(x=>{ tomb(x.id); eventRemove(x.id); });
       state.customTabs=(state.customTabs||[]).filter(x=>x.id!==catId);
       state.events=state.events.filter(x=>!(x.type==="custom"&&x.catId===catId));
       if(state.bebeTab==="c_"+catId) state.bebeTab=null;
@@ -1471,6 +1472,7 @@ const SYNC_INIT="nido_sync_init";
 const VAPID_KEY="BODxg7pjZvTAAfLUJrWec-SyHYxP_HUCanzRWyBybOqDLW2USFYhkAnPh3nXyl-VWRfpExHtgX1BoahF2F_4Mak";  // Web Push cicogna-57ae0
 let FB=null, fdoc=null, fbReady=false, pendingWrite=false, dirty=false, pushTimer=null, registerPush=null;
 let fdb=null;                 // istanza Firestore (per i file dei documenti, salvati a pezzi in 'nido_files')
+let EVENTS_COL=null, evMigrated=false;   // gli EVENTI stanno in una sottocollezione (una schedina a voce): nessun tetto di 1MB, scritture minuscole
 let stoOk = (function(){ try{ const v=localStorage.getItem("nido_sto_ok"); return v===null?null:v==="1"; }catch(e){ return null; } })();  // null=sconosciuto, true/false=esito ultimo upload
 function setStoOk(v){ stoOk=v; try{ localStorage.setItem("nido_sto_ok", v?"1":"0"); }catch(e){} }
 
@@ -1479,12 +1481,12 @@ function setConn(kind,label){
   if(d) d.className="d "+kind;
   if(t&&label) t.textContent=label;
 }
-function syncedSubset(s){ const o={}; SYNC_KEYS.forEach(k=> o[k]= (k==="deleted") ? (s[k]||{}) : (s[k]!=null ? s[k] : [])); return o; }
+function syncedSubset(s){ const o={}; SYNC_KEYS.forEach(k=>{ if(k==="events") return;  o[k]= (k==="deleted") ? (s[k]||{}) : (s[k]!=null ? s[k] : []); }); return o; }  // NB: 'events' NON va più nel documentone (stanno nella sottocollezione) → il doc non cresce più verso il tetto di 1MB
 /* Tombstone: segno gli id cancellati così la cancellazione "vince" e non torna
    dall'altro telefono (che altrimenti la ri-aggiungerebbe con la fusione). */
 function tomb(){ state.deleted=state.deleted||{}; for(let i=0;i<arguments.length;i++){ const id=arguments[i]; if(id) state.deleted[id]=Date.now(); } }
 function allIds(s){ const ids=new Set();
-  ["events","tasks","weights","customTabs","lists","docs","numbers"].forEach(k=> (s[k]||[]).forEach(x=>{ if(x&&x.id) ids.add(x.id); }));
+  ["tasks","weights","customTabs","lists","docs","numbers"].forEach(k=> (s[k]||[]).forEach(x=>{ if(x&&x.id) ids.add(x.id); }));  // 'events' escluso: si sincronizza dalla sottocollezione, non dal push completo
   (s.lists||[]).forEach(l=> (l.items||[]).forEach(i=>{ if(i&&i.id) ids.add(i.id); })); return ids; }
 /* Serve un push? Solo se il mio stato ha id o tombstone che il server non ha
    (mie aggiunte/cancellazioni da propagare). Basato su INSIEMI → niente ping-pong. */
@@ -1533,6 +1535,53 @@ function cloudFastAdd(field, obj){
   if(!fbReady || !fdb || !FB.updateDoc || !FB.arrayUnion) return;
   try{ FB.updateDoc(fdoc, { [field]: FB.arrayUnion(obj) }); }catch(e){ console.warn("fastAdd", e); }
 }
+/* ===== EVENTI in sottocollezione (nido .../events/{id}) =====
+   Ogni voce del diario è un documento a sé: scrittura minuscola e istantanea
+   (parte anche se blocchi il telefono subito dopo) e niente tetto di 1MB. */
+function eventRef(id){ return FB.doc(fdb, ROOM_COL, ROOM_DOC, "events", String(id)); }
+function eventPush(ev){            // aggiunta E modifica: riscrive quella singola schedina
+  if(!fbReady || !EVENTS_COL || !FB.setDoc || !ev || !ev.id) return;
+  try{ FB.setDoc(eventRef(ev.id), ev); }catch(e){ console.warn("eventPush", e); }
+}
+function eventRemove(id){          // cancellazione: toglie la schedina dal cloud
+  if(!fbReady || !EVENTS_COL || !FB.deleteDoc || !id) return;
+  try{ FB.deleteDoc(eventRef(id)); }catch(e){ console.warn("eventRemove", e); }
+}
+/* Fusione in lettura: unisco per id gli eventi del server a quelli locali, scarto i
+   cancellati (tombstone), ordino. ADDITIVA: non butta via nulla già presente. */
+function mergeEventsInto(incoming){
+  const dele=state.deleted||{}, map={};
+  (state.events||[]).forEach(e=>{ if(e&&e.id && !dele[e.id]) map[e.id]=e; });
+  (incoming||[]).forEach(e=>{ if(e&&e.id && !dele[e.id]) map[e.id]=e; });   // il server vince per id
+  state.events=Object.values(map).sort((a,b)=>b.at-a.at);
+  try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){}
+}
+/* Auto-guarigione: se ho in locale eventi che il server non ha ancora (aggiunta
+   fatta offline o scrittura lampo non partita), li ripubblico nella sottocollezione. */
+function healEvents(serverEvents){
+  if(!fbReady || !EVENTS_COL || !FB.setDoc) return;
+  const srv=new Set((serverEvents||[]).map(e=>e&&e.id)); const dele=state.deleted||{};
+  (state.events||[]).forEach(e=>{ if(e&&e.id && !srv.has(e.id) && !dele[e.id]) eventPush(e); });
+}
+/* MIGRAZIONE (una tantum, sicurissima): sposto gli eventi dal vecchio array del
+   documentone alla sottocollezione, POI svuoto l'array così il doc si sgonfia.
+   Se qualcosa fallisce NON svuoto nulla → zero perdita (si legge ancora dall'array). */
+async function migrateEventsOnce(mainArray){
+  if(evMigrated || !fbReady || !EVENTS_COL || !FB.writeBatch || !FB.updateDoc) return;
+  const dele=state.deleted||{};
+  const live=(mainArray||[]).filter(e=> e&&e.id && !dele[e.id]);
+  if(!live.length){ evMigrated=true; return; }     // array già vuoto: migrazione conclusa
+  try{
+    for(let i=0;i<live.length;i+=400){
+      const b=FB.writeBatch(fdb);
+      live.slice(i,i+400).forEach(e=> b.set(eventRef(e.id), e));
+      await b.commit();
+    }
+    await FB.updateDoc(fdoc, { events: [] });        // tutte salvate nella sottocollezione → sgonfio il documentone
+    evMigrated=true;
+    console.log("Migrazione eventi → sottocollezione OK:", live.length);
+  }catch(e){ console.warn("Migrazione eventi rimandata (nessuna perdita)", e); }  // riprovo alla prossima apertura
+}
 /* Flush immediato quando l'app va in background o viene chiusa: senza questo, se
    modifichi e chiudi subito, il push in coda (300ms) non parte e l'altro telefono
    non vede l'aggiornamento finché non riapri qui. */
@@ -1548,6 +1597,7 @@ function applyServerData(data){
   SYNC_KEYS.forEach(k=> state[k]=m[k]);
   try{ localStorage.setItem(KEY,JSON.stringify(state)); }catch(e){}
   if(needsPush(m, data)) scheduleCloudPush();   // propaga mie aggiunte/cancellazioni
+  if(data.events && data.events.length) migrateEventsOnce(data.events);   // vecchio array ancora pieno → migra alla sottocollezione e sgonfia
 }
 /* Ri-lettura FORZATA dal server ad ogni riapertura dell'app: in background iOS
    sospende l'ascoltatore in tempo reale e alla riapertura può non consegnare subito
@@ -1609,6 +1659,7 @@ async function initSync(){
     const app = appMod.initializeApp(FB_CONFIG);
     fdb = FB.getFirestore(app);
     fdoc = FB.doc(fdb, ROOM_COL, ROOM_DOC);
+    EVENTS_COL = FB.collection(fdb, ROOM_COL, ROOM_DOC, "events");   // sottocollezione del diario
     fbReady = true;
     // --- Notifiche push (FCM): registra il token del telefono nel documento condiviso ---
     try{
@@ -1643,6 +1694,18 @@ async function initSync(){
       (err)=>{ setConn("off","Sync non disponibile"); console.warn("Sync:", err);
         setTimeout(pullNow, 4000);   // l'ascoltatore è caduto: provo a ritirare dal server
       }
+    );
+    // Ascoltatore in TEMPO REALE della sottocollezione eventi: ogni schedina aggiunta
+    // o tolta dall'altro telefono arriva qui subito (e include le mie scritture locali).
+    FB.onSnapshot(EVENTS_COL, {includeMetadataChanges:true},
+      (snap)=>{
+        const serverEvents = snap.docs.map(d=>d.data());
+        if(snap.metadata.fromCache && !serverEvents.length) return;   // ancora niente dal server
+        mergeEventsInto(serverEvents);
+        if(!snap.metadata.fromCache) healEvents(serverEvents);        // ripubblico eventuali miei eventi non ancora sul cloud
+        conservaCampi(render);
+      },
+      (err)=>{ console.warn("Sync eventi:", err); }
     );
   }catch(e){
     setConn("off","Sync non disponibile"); console.warn("Sync non attivo:", e);
