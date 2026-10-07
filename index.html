@@ -1503,7 +1503,23 @@ async function cloudPush(){
   if(!fbReady) return;
   if(pendingWrite){ dirty=true; return; }        // già in scrittura: ripasserò a fine push
   pendingWrite=true; dirty=false;
-  try{ await FB.setDoc(fdoc, syncedSubset(state), {merge:true}); }   // merge: non cancella i dati della lista nascita
+  try{
+    if(FB.runTransaction){
+      // TRANSAZIONE: leggo il server FRESCO, fondo (union+tombstone), poi riscrivo.
+      // Così il salvataggio completo non può MAI cancellare ciò che l'altro telefono
+      // ha appena aggiunto: scrivo sempre l'unione, mai uno stato più vecchio.
+      await FB.runTransaction(fdb, async (tx)=>{
+        const snap = await tx.get(fdoc);
+        const server = snap.exists() ? snap.data() : {};
+        const m = mergeUnion(state, server);
+        SYNC_KEYS.forEach(k=> state[k]=m[k]);      // allineo anche il locale all'unione
+        tx.set(fdoc, syncedSubset(state), {merge:true});
+      });
+      try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){}
+    } else {
+      await FB.setDoc(fdoc, syncedSubset(state), {merge:true});   // ripiego: merge semplice
+    }
+  }
   catch(e){ console.warn("push", e); dirty=true; }
   pendingWrite=false;
   if(dirty) scheduleCloudPush();                 // sono arrivate altre modifiche mentre scrivevo → ripubblico
@@ -1550,6 +1566,11 @@ async function pullNow(){
 }
 document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible") pullNow(); });
 window.addEventListener("pageshow", pullNow);
+/* Battito di lettura: finché l'app è APERTA in primo piano ritiro dal server ogni
+   ~20s. Così il telefono che guarda si allinea da solo a ciò che c'è già sul cloud,
+   SENZA bisogno di aprire l'altro telefono (l'ascoltatore in tempo reale su iOS a
+   volte non consegna da solo). Si ferma quando l'app va in background. */
+setInterval(()=>{ if(fbReady && document.visibilityState==="visible" && !pendingWrite) pullNow(); }, 20000);
 function mergeUnion(local, server){
   const out={};
   // 1) fondo i tombstone (id cancellati) di entrambi, tengo il timestamp più recente,
@@ -1619,10 +1640,19 @@ async function initSync(){
         localStorage.setItem(SYNC_INIT,"1");
         conservaCampi(render);   // non cancellare quello che si sta scrivendo
       },
-      (err)=>{ setConn("off","Sync non disponibile"); console.warn("Sync:", err); }
+      (err)=>{ setConn("off","Sync non disponibile"); console.warn("Sync:", err);
+        setTimeout(pullNow, 4000);   // l'ascoltatore è caduto: provo a ritirare dal server
+      }
     );
-  }catch(e){ setConn("off","Sync non disponibile"); console.warn("Sync non attivo:", e); }
+  }catch(e){
+    setConn("off","Sync non disponibile"); console.warn("Sync non attivo:", e);
+    // Rete ballerina / import fallito: senza questo retry il telefono restava
+    // scollegato per sempre e mostrava solo i propri dati. Riprovo a scalare.
+    initSyncRetry = (initSyncRetry||0) + 1;
+    if(initSyncRetry <= 6) setTimeout(initSync, Math.min(2000*initSyncRetry, 15000));
+  }
 }
+let initSyncRetry=0;
 
 /* ============ Esporta e condividi ============ */
 const CORD_LABEL={asciutto:"asciutto", umido:"umido", arrossato:"arrossato", caduto:"caduto 🎉"};
