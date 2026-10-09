@@ -233,6 +233,11 @@
   .who.fede{background:#e3eefb;color:#2d5f92} .who.sara{background:#fbe8ef;color:#9c3d64}
   .who.tutti{background:var(--sage-bg);color:var(--sage)}
   .row .del{border:none;background:none;font-size:15px;padding:4px;cursor:pointer;opacity:.45}
+  .row.past{opacity:.5}
+  .appt-when{flex:none;min-width:84px;display:flex;flex-direction:column;line-height:1.2}
+  .appt-when b{font-family:'Quicksand';font-weight:700;font-size:13.5px;color:var(--sage);text-transform:capitalize}
+  .appt-when span{font-size:12px;color:var(--ink-soft)}
+  .appt-sep{font-family:'Quicksand';font-weight:600;font-size:12px;color:var(--ink-soft);padding:14px 16px 2px}
   .add{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--line)}
   .add input{flex:1;min-width:0;border:1.5px solid var(--line);border-radius:14px;padding:11px 13px;
     font-family:'Inter';font-size:15px;background:var(--bg);outline:none}
@@ -440,6 +445,7 @@ state.tabOrder = state.tabOrder || [];  // ordine delle schede (chiavi) scelto d
 state.deleted = state.deleted || {};    // tombstone: {id: timestamp} degli elementi cancellati
 state.docs = state.docs || [];          // metadati documenti condivisi: {id,name,type,size,at,sp} (file su Storage)
 state.numbers = state.numbers || [];    // numeri utili: {id, name, tel, at}
+state.appts = state.appts || [];        // appuntamenti: {id, desc, at} (at = data+ora, ms)
 state.percorso = state.percorso || { sel:0, tab:"senses", open:{}, done:{}, manual:false };  // percorso sensoriale (solo locale)
 state.weighDone= state.weighDone|| [];  // chiavi promemoria pesata archiviati
 (function seedVitD(){
@@ -523,7 +529,7 @@ function sinceLabel(ms){
 }
 
 /* ============ Macro ============ */
-const MACROS=[{id:"bebe",label:"👶 Bebè"},{id:"fare",label:"✅ Da fare"},{id:"liste",label:"🛒 Liste"},{id:"percorso",label:"🌱 Percorso"}];
+const MACROS=[{id:"bebe",label:"👶 Bebè"},{id:"fare",label:"✅ Da fare"},{id:"liste",label:"🛒 Liste"},{id:"appunt",label:"📅 Agenda"},{id:"percorso",label:"🌱 Percorso"}];
 function buildMacro(){
   const el=document.getElementById("macro"); el.innerHTML="";
   MACROS.forEach(m=>{
@@ -992,6 +998,68 @@ function renderListe(){
   const ac=v.querySelector("#laddcard");
   if(ac) tapSubito(ac, ()=>openNewSection());
 }
+/* ============ APPUNTAMENTI (visite mediche e impegni) ============ */
+function apptDay(ms){
+  const k=dayKey(ms), t=dayKey(Date.now()), dom=dayKey(Date.now()+86400000), y=dayKey(Date.now()-86400000);
+  if(k===t) return "Oggi"; if(k===dom) return "Domani"; if(k===y) return "Ieri";
+  return new Intl.DateTimeFormat("it-IT",{weekday:"short",day:"numeric",month:"short"}).format(new Date(ms));
+}
+function renderAppts(){
+  const v=document.getElementById("view");
+  const now=Date.now(), tol=now-3600000;   // 1h di tolleranza: un appuntamento non è "passato" subito
+  const list=(state.appts||[]).slice().sort((a,b)=>a.at-b.at);
+  const futuri=list.filter(a=>a.at>=tol);
+  const passati=list.filter(a=>a.at<tol).reverse();   // più recente in cima
+  const riga=(a,past)=> '<div class="row'+(past?" past":"")+'">'
+    + '<div class="appt-when"><b>'+apptDay(a.at)+'</b><span>'+hhmm(a.at)+'</span></div>'
+    + '<div class="t tocca" data-aedit="'+a.id+'">'+esc(a.desc||"Appuntamento")+'</div>'
+    + '<button class="del" data-adel="'+a.id+'" aria-label="Elimina">🗑</button></div>';
+  let h='<div class="card"><div class="card-head" style="cursor:default">'
+    + '<div class="card-emoji">📅</div>'
+    + '<div class="card-title"><h2>Appuntamenti</h2><div class="meta">'
+    + (futuri.length? futuri.length+" in arrivo" : (list.length?"nessuno in arrivo":"niente in agenda"))
+    + '</div></div>'
+    + '<button class="sez-add" id="apptAdd" aria-label="Aggiungi appuntamento">+</button></div>';
+  if(!list.length){
+    h += '<div class="empty"><span class="e">🗓️</span>Ancora nessun appuntamento.<br>Tocca + per aggiungerne uno.</div>';
+  }
+  futuri.forEach(a=> h+=riga(a,false));
+  if(passati.length){ h += '<div class="appt-sep">Passati</div>'; passati.forEach(a=> h+=riga(a,true)); }
+  h += '</div>';
+  v.innerHTML=h;
+  const add=v.querySelector("#apptAdd"); if(add) tapSubito(add, ()=>openApptEdit());
+  v.querySelectorAll("[data-aedit]").forEach(el=> tapSubito(el, ()=>openApptEdit(el.dataset.aedit)));
+  v.querySelectorAll("[data-adel]").forEach(b=> b.onclick=(e)=>{ e.stopPropagation();
+    askConfirm("Vuoi eliminare questo appuntamento?", ()=>apptDelete(b.dataset.adel)); });
+}
+function openApptEdit(id){
+  const s=document.getElementById("sheet");
+  const a0 = id ? (state.appts||[]).find(x=>x.id===id) : null;
+  const base = a0 ? new Date(a0.at) : (()=>{ const d=new Date(); d.setHours(d.getHours()+1,0,0,0); return d; })();
+  const iso=base.getFullYear()+"-"+String(base.getMonth()+1).padStart(2,"0")+"-"+String(base.getDate()).padStart(2,"0");
+  const hm=String(base.getHours()).padStart(2,"0")+":"+String(base.getMinutes()).padStart(2,"0");
+  s.innerHTML =
+    '<h3>'+(a0?"Modifica appuntamento":"Nuovo appuntamento")+'</h3><div class="hint">Descrizione, giorno e ora</div>'
+    + '<div class="lbl">Descrizione</div><div class="fld"><input id="adesc" type="text" placeholder="es. Visita pediatra" value="'+esc(a0?(a0.desc||""):"")+'"></div>'
+    + '<div class="lbl">Giorno</div><div class="fld"><input id="adate" type="date" value="'+iso+'"></div>'
+    + '<div class="lbl">Ora</div><div class="fld"><input id="atime" type="time" value="'+hm+'"></div>'
+    + '<button class="go" id="ago">'+(a0?"Salva modifiche":"Aggiungi")+'</button>'
+    + '<button class="cancel" id="acancel">Annulla</button>';
+  document.getElementById("scrim").classList.add("on");
+  s.querySelector("#ago").onclick=()=>{
+    const desc=s.querySelector("#adesc").value.trim();
+    const d=s.querySelector("#adate").value, tm=s.querySelector("#atime").value||"09:00";
+    if(!d){ toast("Scegli il giorno"); return; }
+    if(!desc){ toast("Scrivi una descrizione"); return; }
+    const at=new Date(d+"T"+tm).getTime();
+    if(a0){ state.appts=(state.appts||[]).map(x=> x.id===a0.id ? {id:a0.id, desc:desc, at:at} : x); }
+    else { state.appts=state.appts||[]; state.appts.push({id:uid(), desc:desc, at:at}); }
+    state.appts.sort((a,b)=>a.at-b.at);
+    save(); closeSheet(); render(); toast(a0?"Appuntamento salvato":"Appuntamento aggiunto");
+  };
+  s.querySelector("#acancel").onclick=closeSheet;
+}
+function apptDelete(id){ tomb(id); state.appts=(state.appts||[]).filter(x=>x.id!==id); save(); render(); }
 /* Il tasto deve rispondere al primo tocco anche con la tastiera aperta.
    NB: bloccare il pointerdown impedisce del tutto il click su iOS: qui si agisce
    al sollevamento del dito, con una guardia contro il doppio scatto. */
@@ -1445,12 +1513,14 @@ function render(){
   if(activeMacro==="bebe") renderBebe();
   else if(activeMacro==="fare") renderFare();
   else if(activeMacro==="percorso") renderPercorso();
+  else if(activeMacro==="appunt") renderAppts();
   else renderListe();
   const t=state.events.filter(e=>dayKey(e.at)===dayKey(Date.now()));
   fillBirth();
   document.getElementById("sub").textContent =
     activeMacro==="bebe" ? (t.length? "Oggi: "+t.filter(e=>e.type==="feed").length+" poppate · "+t.filter(e=>e.type==="diaper").length+" cambi" : "Il diario del bebè")
     : activeMacro==="fare" ? "Compiti di Fede e Sara"
+    : activeMacro==="appunt" ? "Visite mediche e impegni"
     : activeMacro==="percorso" ? "Percorso sensoriale dei primi 12 mesi" : "Cosa serve al nido";
 }
 document.getElementById("scrim").onclick=(e)=>{ if(e.target.id==="scrim") closeSheet(); };
@@ -1467,7 +1537,7 @@ const FB_CONFIG={
 /* Le regole del progetto autorizzano solo questo documento: ci scriviamo dentro i nostri
    campi SENZA toccare quelli della vecchia lista nascita (vedi merge:true più sotto). */
 const ROOM_COL="LL09Rb8OO0yjHQnJBsPCPSu1", ROOM_DOC="YXZm9MNsAFCNNQiTgQnU7LEg";
-const SYNC_KEYS=["events","tasks","lists","weights","customTabs","docs","numbers","weighDone","tabOrder","deleted"];
+const SYNC_KEYS=["events","tasks","lists","weights","customTabs","docs","numbers","appts","weighDone","tabOrder","deleted"];
 const SYNC_INIT="nido_sync_init";
 const VAPID_KEY="BODxg7pjZvTAAfLUJrWec-SyHYxP_HUCanzRWyBybOqDLW2USFYhkAnPh3nXyl-VWRfpExHtgX1BoahF2F_4Mak";  // Web Push cicogna-57ae0
 let FB=null, fdoc=null, fbReady=false, pendingWrite=false, dirty=false, pushTimer=null, registerPush=null;
@@ -1486,7 +1556,7 @@ function syncedSubset(s){ const o={}; SYNC_KEYS.forEach(k=>{ if(k==="events") re
    dall'altro telefono (che altrimenti la ri-aggiungerebbe con la fusione). */
 function tomb(){ state.deleted=state.deleted||{}; for(let i=0;i<arguments.length;i++){ const id=arguments[i]; if(id) state.deleted[id]=Date.now(); } }
 function allIds(s){ const ids=new Set();
-  ["tasks","weights","customTabs","lists","docs","numbers"].forEach(k=> (s[k]||[]).forEach(x=>{ if(x&&x.id) ids.add(x.id); }));  // 'events' escluso: si sincronizza dalla sottocollezione, non dal push completo
+  ["tasks","weights","customTabs","lists","docs","numbers","appts"].forEach(k=> (s[k]||[]).forEach(x=>{ if(x&&x.id) ids.add(x.id); }));  // 'events' escluso: si sincronizza dalla sottocollezione, non dal push completo
   (s.lists||[]).forEach(l=> (l.items||[]).forEach(i=>{ if(i&&i.id) ids.add(i.id); })); return ids; }
 /* Serve un push? Solo se il mio stato ha id o tombstone che il server non ha
    (mie aggiunte/cancellazioni da propagare). Basato su INSIEMI → niente ping-pong. */
@@ -1637,6 +1707,7 @@ function mergeUnion(local, server){
   out.customTabs = byId(server.customTabs, local.customTabs);
   out.docs = byId(server.docs, local.docs).sort((a,b)=>b.at-a.at);   // metadati documenti (file su Storage)
   out.numbers = byId(server.numbers, local.numbers).sort((a,b)=>b.at-a.at);   // numeri utili
+  out.appts = byId(server.appts, local.appts).sort((a,b)=>a.at-b.at);         // appuntamenti (crescente: prima i più vicini)
   out.weighDone = uniq(server.weighDone, local.weighDone);
   out.tabOrder = (server.tabOrder&&server.tabOrder.length)?server.tabOrder:(local.tabOrder||[]);
   const lm={};
