@@ -141,6 +141,10 @@
     display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;min-width:0;position:relative;
     box-shadow:var(--shadow-soft);transition:.16s}
   .scheda:active{transform:scale(.97)}
+  .tile-add{position:absolute;top:4px;right:4px;width:22px;height:22px;padding:0;border:none;border-radius:8px;
+    background:var(--cat,var(--sage));color:#fff;font-size:16px;font-weight:700;line-height:1;
+    display:grid;place-items:center;cursor:pointer;opacity:.92;z-index:2;box-shadow:0 1px 3px rgba(38,52,42,.18)}
+  .tile-add:active{transform:scale(.86)}
   .scheda .ic{font-size:22px;line-height:1.1}
   .scheda .ti{font-family:'Quicksand';font-weight:700;font-size:13px;color:var(--cat,var(--ink-soft));line-height:1.2;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
@@ -765,11 +769,12 @@ function renderBebe(){
 
   let h=remindersHTML()+'<div class="schede">';
   SCHEDE.forEach(x=>{
-    h += '<button class="scheda'+(sel===x.k?" on":"")+'" data-tab="'+x.k+'" style="--catbg:'+x.bg+';--cat:'+x.fg+'">'
+    h += '<div class="scheda'+(sel===x.k?" on":"")+'" data-tab="'+x.k+'" role="button" tabindex="0" style="--catbg:'+x.bg+';--cat:'+x.fg+'">'
+      + '<button class="tile-add" data-qadd="'+x.k+'" aria-label="Registra '+esc(x.titolo)+'">+</button>'
       + '<span class="ic">'+x.emoji+'</span>'
       + '<span class="ti">'+x.titolo+'</span>'
       + '<span class="nm">'+(x.k==="weight" ? (w.length?fmtKg(w[0].kg)+" kg":"—") : (x.k==="length"||x.k==="foot") ? (x.righe.length?x.righe[0].cm+" cm":"—") : (x.oggi?x.oggi+" oggi":"—"))+'</span>'
-      + '</button>';
+      + '</div>';
   });
   h += '<button class="scheda addtab" id="addtabbtn"><span class="ic">＋</span><span class="ti">Aggiungi</span><span class="nm">scheda</span></button>';
   h += '</div>';
@@ -856,6 +861,16 @@ function renderBebe(){
     save(); render();
   });
   enableTabDrag(v.querySelector(".schede"));
+  // "+" su ogni tessera: registra al volo senza aprire l'elenco
+  v.querySelectorAll("[data-qadd]").forEach(b=>{
+    b.addEventListener("pointerdown", e=> e.stopPropagation());   // non far partire il trascinamento della tessera
+    b.onclick=(e)=>{ e.stopPropagation();
+      const k=b.dataset.qadd;
+      if(k==="weight") openWeight();
+      else if(k.indexOf("c_")===0) openEvent("custom", null, k.slice(2));
+      else openEvent(k);
+    };
+  });
   v.querySelectorAll("[data-new]").forEach(b=> b.onclick=(e)=>{
     e.stopPropagation();
     const k=b.dataset.new;
