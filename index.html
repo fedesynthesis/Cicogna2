@@ -572,8 +572,8 @@ function closeSheet(){ document.getElementById("scrim").classList.remove("on"); 
 function renderSheetEvent(){
   const f=draft, s=document.getElementById("sheet");
   const cTab = f.type==="custom" ? ((state.customTabs||[]).find(t=>t.id===f.catId)||{name:"Scheda"}) : null;
-  const titolo = (f.id?"Modifica ":"") + (f.type==="diaper" ? "cambio" : f.type==="feed" ? "poppata" : f.type==="cord" ? "medicazione" : f.type==="bath" ? "bagnetto" : f.type==="pump" ? "tiralatte" : f.type==="length" ? "altezza" : f.type==="custom" ? (cTab.name||"voce").toLowerCase() : "vomito");
-  const hint   = f.type==="diaper" ? "Cosa ha fatto" : f.type==="feed" ? "Come ha mangiato" : f.type==="cord" ? "Cordone ombelicale" : f.type==="bath" ? "Totale nella vaschetta, o parziale a pezzi" : f.type==="pump" ? "Lato e quantità tirata" : f.type==="length" ? "Lunghezza misurata del bambino" : f.type==="custom" ? "Quando è stato" : "Quando è successo";
+  const titolo = (f.id?"Modifica ":"") + (f.type==="diaper" ? "cambio" : f.type==="feed" ? "poppata" : f.type==="cord" ? "medicazione" : f.type==="bath" ? "bagnetto" : f.type==="pump" ? "tiralatte" : f.type==="length" ? "altezza" : f.type==="foot" ? "lunghezza piede" : f.type==="custom" ? (cTab.name||"voce").toLowerCase() : "vomito");
+  const hint   = f.type==="diaper" ? "Cosa ha fatto" : f.type==="feed" ? "Come ha mangiato" : f.type==="cord" ? "Cordone ombelicale" : f.type==="bath" ? "Totale nella vaschetta, o parziale a pezzi" : f.type==="pump" ? "Lato e quantità tirata" : f.type==="length" ? "Lunghezza misurata del bambino" : f.type==="foot" ? "Lunghezza del piedino misurata" : f.type==="custom" ? "Quando è stato" : "Quando è successo";
 
   let campi="";
   if(f.type==="diaper"){
@@ -619,6 +619,8 @@ function renderSheetEvent(){
       + '<div class="lbl">Quantità</div><div class="fld"><input id="pml" type="number" inputmode="numeric" placeholder="quanti ml" value="'+(f.ml||"")+'"><span class="u">ml</span></div>';
   } else if(f.type==="length"){
     campi = '<div class="lbl">Lunghezza</div><div class="fld"><input id="lcm" type="number" inputmode="decimal" step="0.1" placeholder="es. 52" value="'+(f.cm||"")+'"><span class="u">cm</span></div>';
+  } else if(f.type==="foot"){
+    campi = '<div class="lbl">Lunghezza piede</div><div class="fld"><input id="fcm" type="number" inputmode="decimal" step="0.1" placeholder="es. 8,5" value="'+(f.cm||"")+'"><span class="u">cm</span></div>';
   } else if(f.type==="custom"){
     campi = "";
   } else {
@@ -664,9 +666,11 @@ function renderSheetEvent(){
     else if(draft.type==="bath"){ ev.stato=draft.stato||"totale"; ev.dove=(ev.stato==="parziale")?(draft.dove||null):null; }
     else if(draft.type==="pump"){ const ml=s.querySelector("#pml"); ev.side=draft.side||null; ev.ml=ml?(parseInt(ml.value,10)||null):null; }
     else if(draft.type==="length"){ const cm=s.querySelector("#lcm"); ev.cm=cm?(parseFloat(String(cm.value).replace(",","."))||null):null; }
+    else if(draft.type==="foot"){ const cm=s.querySelector("#fcm"); ev.cm=cm?(parseFloat(String(cm.value).replace(",","."))||null):null; }
     else if(draft.type==="custom"){ ev.catId=draft.catId||null; }
     else { ev.amount=draft.amount||null; }
     if(ev.type==="length" && ev.cm==null){ toast("Scrivi l'altezza in cm"); return; }
+    if(ev.type==="foot" && ev.cm==null){ toast("Scrivi la lunghezza del piede in cm"); return; }
     const modifica = !!draft.id;
     if(modifica){ ev.id=draft.id; state.events=state.events.map(x=> x.id===draft.id ? ev : x); }
     else { state.events.unshift(ev); }
@@ -751,7 +755,9 @@ function renderBebe(){
     { k:"weight", emoji:"⚖️", titolo:"Peso",    oggi:null,    righe:w,
       bg:"#d3e3f1", fg:"#3c6a8e" },
     { k:"length", emoji:"📏", titolo:"Altezza",  oggi:null,    righe:ev.filter(e=>e.type==="length"),
-      bg:"#d4e8e4", fg:"#2f736a" }
+      bg:"#d4e8e4", fg:"#2f736a" },
+    { k:"foot",   emoji:"👣", titolo:"Lungh. piede", oggi:null, righe:ev.filter(e=>e.type==="foot"),
+      bg:"#e0e0f3", fg:"#565a9c" }
   ];
   const _oi = k => { const i=(state.tabOrder||[]).indexOf(k); return i<0?999:i; };
   SCHEDE.sort((a,b)=> _oi(a.k)-_oi(b.k));   // ordine scelto da noi (le nuove restano in coda)
@@ -762,7 +768,7 @@ function renderBebe(){
     h += '<button class="scheda'+(sel===x.k?" on":"")+'" data-tab="'+x.k+'" style="--catbg:'+x.bg+';--cat:'+x.fg+'">'
       + '<span class="ic">'+x.emoji+'</span>'
       + '<span class="ti">'+x.titolo+'</span>'
-      + '<span class="nm">'+(x.k==="weight" ? (w.length?fmtKg(w[0].kg)+" kg":"—") : x.k==="length" ? (x.righe.length?x.righe[0].cm+" cm":"—") : (x.oggi?x.oggi+" oggi":"—"))+'</span>'
+      + '<span class="nm">'+(x.k==="weight" ? (w.length?fmtKg(w[0].kg)+" kg":"—") : (x.k==="length"||x.k==="foot") ? (x.righe.length?x.righe[0].cm+" cm":"—") : (x.oggi?x.oggi+" oggi":"—"))+'</span>'
       + '</button>';
   });
   h += '<button class="scheda addtab" id="addtabbtn"><span class="ic">＋</span><span class="ti">Aggiungi</span><span class="nm">scheda</span></button>';
@@ -777,7 +783,7 @@ function renderBebe(){
       + '<div class="card-emoji">'+x.emoji+'</div>'
       + '<div class="card-title"><h2>'+x.titolo+'</h2><div class="meta">'
       + (x.k==="weight" ? (w.length? w.length+" pesate · ultima "+fmtDate(w[0].at) : "nessuna pesata")
-         : x.k==="length" ? (x.righe.length? x.righe.length+" misure · ultima "+fmtDate(x.righe[0].at) : "nessuna misura")
+         : (x.k==="length"||x.k==="foot") ? (x.righe.length? x.righe.length+" misure · ultima "+fmtDate(x.righe[0].at) : "nessuna misura")
                         : (x.righe.length? x.righe.length+" in tutto · "+(x.oggi||0)+" oggi" : "ancora niente"))
       + '</div></div>'
       + '<button class="card-del" id="reordbtn" aria-label="Ordina schede" style="font-size:15px">↕</button>'
@@ -817,6 +823,7 @@ function renderBebe(){
         else if(e.type==="bath") tit=(e.stato==="parziale"?"🧽 Parziale"+(e.dove?" · "+e.dove:""):"🛁 Totale · vaschetta");
         else if(e.type==="pump"){ const L=e.side==="dx"?"Destro":e.side==="due"?"Entrambi":e.side==="sx"?"Sinistro":""; tit="🥛 "+(L||"Tiralatte")+(e.ml?" · "+e.ml+" ml":""); }
         else if(e.type==="length") tit="📏 "+(e.cm?e.cm+" cm":"misura");
+        else if(e.type==="foot") tit="👣 "+(e.cm?e.cm+" cm":"misura");
         else if(e.type==="custom") tit=(e.note?e.note:"Registrato");
         else                      tit=(KINDS[e.kind]||KINDS.pipi).e+" "+(KINDS[e.kind]||KINDS.pipi).t;
         h += '<div class="ev tocca" data-edit="'+e.id+'"><div class="dot">'+dayShort(e.at)+'</div>'
@@ -1187,7 +1194,8 @@ function currentTabList(){
     {k:"cord",emoji:"🩹",name:"Cordone"},
     {k:"bath",emoji:"🛁",name:"Bagnetto"},
     {k:"pump",emoji:"🥛",name:"Tiralatte"},
-    {k:"length",emoji:"📏",name:"Altezza"}
+    {k:"length",emoji:"📏",name:"Altezza"},
+    {k:"foot",emoji:"👣",name:"Lungh. piede"}
   ];
   (state.customTabs||[]).filter(t=> !t.from || today>=t.from).forEach(t=> list.push({k:"c_"+t.id, emoji:t.emoji||"⭐", name:t.name||"Scheda"}));
   list.push({k:"weight",emoji:"⚖️",name:"Peso"});
