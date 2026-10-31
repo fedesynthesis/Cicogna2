@@ -206,7 +206,8 @@
   .ev .txt{flex:1;min-width:0}
   .ev .txt b{font-family:'Quicksand';font-weight:600;font-size:15px}
   .ev .txt span{display:block;font-size:12.5px;color:var(--ink-soft)}
-  .ev .time{font-family:'Quicksand';font-weight:600;font-size:14px;color:var(--ink-soft);flex:none}
+  .ev .time{font-family:'Quicksand';font-weight:600;font-size:14px;color:var(--ink-soft);flex:none;display:flex;flex-direction:column;align-items:flex-end;line-height:1.15}
+  .ev .time .ago{font-family:'Inter',sans-serif;font-weight:500;font-size:10.5px;color:var(--ink-soft);opacity:.65;margin-top:2px;white-space:nowrap}
   .ev .del{border:none;background:none;font-size:16px;padding:4px;cursor:pointer;opacity:.5}
   /* pesata di DOMENICA: riga evidenziata (checkpoint settimanale) */
   .ev.sun{background:#fff7e6;box-shadow:inset 4px 0 0 #e0a92e}
@@ -531,6 +532,16 @@ function sinceLabel(ms){
   const h=Math.floor(m/60);
   return h+"h "+(m%60?(m%60)+"m ":"")+"fa";
 }
+/* Tempo trascorso in italiano esteso, per le righe della lista: "1 ora fa" ecc. */
+function relFa(ms){
+  const m=Math.floor((Date.now()-ms)/60000);
+  if(m<1) return "adesso";
+  if(m<60) return m+" min fa";
+  const h=Math.floor(m/60);
+  if(h<24) return h===1 ? "1 ora fa" : h+" ore fa";
+  const g=Math.floor(h/24);
+  return g===1 ? "ieri" : g+" giorni fa";
+}
 
 /* ============ Macro ============ */
 const MACROS=[{id:"bebe",label:"👶 Bebè"},{id:"fare",label:"✅ Da fare"},{id:"liste",label:"🛒 Liste"},{id:"appunt",label:"📅 Agenda"},{id:"percorso",label:"🌱 Percorso"}];
@@ -833,7 +844,7 @@ function renderBebe(){
         else                      tit=(KINDS[e.kind]||KINDS.pipi).e+" "+(KINDS[e.kind]||KINDS.pipi).t;
         h += '<div class="ev tocca" data-edit="'+e.id+'"><div class="dot">'+dayShort(e.at)+'</div>'
           + '<div class="txt"><b>'+tit+'</b>'+((e.note && e.type!=="custom")?'<span>'+esc(e.note)+'</span>':'')+'</div>'
-          + '<div class="time">'+hhmm(e.at)+'</div>'
+          + '<div class="time">'+hhmm(e.at)+'<span class="ago">'+relFa(e.at)+'</span></div>'
           + '<button class="del" data-del="'+e.id+'">🗑</button></div>';
       });
     }
