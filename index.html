@@ -532,26 +532,17 @@ function sinceLabel(ms){
   const h=Math.floor(m/60);
   return h+"h "+(m%60?(m%60)+"m ":"")+"fa";
 }
-/* Tempo trascorso per le righe della lista: "adesso", "N min fa",
-   "1h 20m fa" (ore + minuti), "ieri", "N giorni fa". */
-function relFa(ms){
-  const tot=Math.floor((Date.now()-ms)/60000);
-  if(tot<1) return "adesso";
-  if(tot<60) return tot+" min fa";
-  const h=Math.floor(tot/60);
-  if(h<24){ const m=tot%60; return h+"h"+(m?" "+m+"m":"")+" fa"; }
-  const g=Math.floor(h/24);
-  return g===1 ? "ieri" : g+" giorni fa";
+/* Durata di un intervallo (fra due eventi): "45m", "1h 20m", "2g 3h".
+   Usata nelle righe per mostrare la distanza dalla voce precedente. */
+function durata(ms){
+  const tot=Math.round(ms/60000);
+  if(tot<1) return "<1m";
+  if(tot<60) return tot+"m";
+  const h=Math.floor(tot/60), m=tot%60;
+  if(h<24) return h+"h"+(m?" "+m+"m":"");
+  const g=Math.floor(h/24), rh=h%24;
+  return g+"g"+(rh?" "+rh+"h":"");
 }
-/* Aggiorna in tempo reale (ogni minuto) le etichette "X fa" già a schermo,
-   senza ri-renderizzare tutta la vista (così non si perde scroll/digitazione). */
-function aggiornaRelativi(){
-  document.querySelectorAll('.ago[data-ago]').forEach(function(el){
-    const t=parseInt(el.dataset.ago,10); if(t) el.textContent=relFa(t);
-  });
-}
-setInterval(aggiornaRelativi, 60000);
-document.addEventListener("visibilitychange", function(){ if(document.visibilityState==="visible") aggiornaRelativi(); });
 
 /* ============ Macro ============ */
 const MACROS=[{id:"bebe",label:"👶 Bebè"},{id:"fare",label:"✅ Da fare"},{id:"liste",label:"🛒 Liste"},{id:"appunt",label:"📅 Agenda"},{id:"percorso",label:"🌱 Percorso"}];
@@ -841,8 +832,10 @@ function renderBebe(){
           + '<button class="del" data-wdel="'+it.id+'">🗑</button></div>';
       });
     } else {
-      x.righe.slice(0,60).forEach(e=>{
+      x.righe.slice(0,60).forEach((e,i)=>{
         let tit;
+        const prevEv=x.righe[i+1];   // la voce precedente (più vecchia) della stessa categoria
+        const gap = prevEv ? '<span class="ago">⏱ '+durata(e.at-prevEv.at)+'</span>' : '';
         if(e.type==="feed")       tit=(e.mode==="seno"?"🤱 ":e.mode==="biberon"?"🍼 ":"🥄 ")+feedText(e);
         else if(e.type==="vomit") tit="Vomito"+(e.amount?" · "+e.amount:"");
         else if(e.type==="cord") tit=(e.stato==="caduto"?"🎉 Cordone caduto":"Medicazione"+(e.stato?" · "+e.stato:""));
@@ -854,7 +847,7 @@ function renderBebe(){
         else                      tit=(KINDS[e.kind]||KINDS.pipi).e+" "+(KINDS[e.kind]||KINDS.pipi).t;
         h += '<div class="ev tocca" data-edit="'+e.id+'"><div class="dot">'+dayShort(e.at)+'</div>'
           + '<div class="txt"><b>'+tit+'</b>'+((e.note && e.type!=="custom")?'<span>'+esc(e.note)+'</span>':'')+'</div>'
-          + '<div class="time">'+hhmm(e.at)+'<span class="ago" data-ago="'+e.at+'">'+relFa(e.at)+'</span></div>'
+          + '<div class="time">'+hhmm(e.at)+gap+'</div>'
           + '<button class="del" data-del="'+e.id+'">🗑</button></div>';
       });
     }
