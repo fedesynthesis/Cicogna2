@@ -208,6 +208,7 @@
   .ev .txt span{display:block;font-size:12.5px;color:var(--ink-soft)}
   .ev .time{font-family:'Quicksand';font-weight:600;font-size:14px;color:var(--ink-soft);flex:none;display:flex;flex-direction:column;align-items:flex-end;line-height:1.15}
   .ev .time .ago{font-family:'Inter',sans-serif;font-weight:500;font-size:10.5px;color:var(--ink-soft);opacity:.65;margin-top:2px;white-space:nowrap}
+  .ev .time .ago.now{color:var(--cat,var(--sage));opacity:.95;font-weight:600}
   .ev .del{border:none;background:none;font-size:16px;padding:4px;cursor:pointer;opacity:.5}
   /* pesata di DOMENICA: riga evidenziata (checkpoint settimanale) */
   .ev.sun{background:#fff7e6;box-shadow:inset 4px 0 0 #e0a92e}
@@ -543,6 +544,26 @@ function durata(ms){
   const g=Math.floor(h/24), rh=h%24;
   return g+"g"+(rh?" "+rh+"h":"");
 }
+/* Tempo trascorso DA ADESSO: solo sull'ULTIMA attività di ogni categoria,
+   per sapere a colpo d'occhio da quanto. Si auto-aggiorna (vedi sotto). */
+function faAdesso(ms){
+  const tot=Math.floor((Date.now()-ms)/60000);
+  if(tot<1) return "adesso";
+  if(tot<60) return tot+" min fa";
+  const h=Math.floor(tot/60);
+  if(h<24){ const m=tot%60; return h+"h"+(m?" "+m+"m":"")+" fa"; }
+  const g=Math.floor(h/24);
+  return g===1 ? "ieri" : g+" giorni fa";
+}
+/* Aggiorna in tempo reale (ogni minuto) solo le etichette "da adesso"
+   (le righe con data-ago = l'ultima attività), senza ri-renderizzare. */
+function aggiornaRelativi(){
+  document.querySelectorAll('.ago[data-ago]').forEach(function(el){
+    const t=parseInt(el.dataset.ago,10); if(t) el.textContent=faAdesso(t);
+  });
+}
+setInterval(aggiornaRelativi, 60000);
+document.addEventListener("visibilitychange", function(){ if(document.visibilityState==="visible") aggiornaRelativi(); });
 
 /* ============ Macro ============ */
 const MACROS=[{id:"bebe",label:"👶 Bebè"},{id:"fare",label:"✅ Da fare"},{id:"liste",label:"🛒 Liste"},{id:"appunt",label:"📅 Agenda"},{id:"percorso",label:"🌱 Percorso"}];
@@ -836,6 +857,8 @@ function renderBebe(){
         let tit;
         const prevEv=x.righe[i+1];   // la voce precedente (più vecchia) della stessa categoria
         const gap = prevEv ? '<span class="ago">⏱ '+durata(e.at-prevEv.at)+'</span>' : '';
+        // solo sull'ULTIMA attività (la più recente): quanto tempo da allora a ora
+        const daOra = (i===0) ? '<span class="ago now" data-ago="'+e.at+'">'+faAdesso(e.at)+'</span>' : '';
         if(e.type==="feed")       tit=(e.mode==="seno"?"🤱 ":e.mode==="biberon"?"🍼 ":"🥄 ")+feedText(e);
         else if(e.type==="vomit") tit="Vomito"+(e.amount?" · "+e.amount:"");
         else if(e.type==="cord") tit=(e.stato==="caduto"?"🎉 Cordone caduto":"Medicazione"+(e.stato?" · "+e.stato:""));
@@ -847,7 +870,7 @@ function renderBebe(){
         else                      tit=(KINDS[e.kind]||KINDS.pipi).e+" "+(KINDS[e.kind]||KINDS.pipi).t;
         h += '<div class="ev tocca" data-edit="'+e.id+'"><div class="dot">'+dayShort(e.at)+'</div>'
           + '<div class="txt"><b>'+tit+'</b>'+((e.note && e.type!=="custom")?'<span>'+esc(e.note)+'</span>':'')+'</div>'
-          + '<div class="time">'+hhmm(e.at)+gap+'</div>'
+          + '<div class="time">'+hhmm(e.at)+daOra+gap+'</div>'
           + '<button class="del" data-del="'+e.id+'">🗑</button></div>';
       });
     }
