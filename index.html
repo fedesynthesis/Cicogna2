@@ -532,16 +532,26 @@ function sinceLabel(ms){
   const h=Math.floor(m/60);
   return h+"h "+(m%60?(m%60)+"m ":"")+"fa";
 }
-/* Tempo trascorso in italiano esteso, per le righe della lista: "1 ora fa" ecc. */
+/* Tempo trascorso per le righe della lista: "adesso", "N min fa",
+   "1h 20m fa" (ore + minuti), "ieri", "N giorni fa". */
 function relFa(ms){
-  const m=Math.floor((Date.now()-ms)/60000);
-  if(m<1) return "adesso";
-  if(m<60) return m+" min fa";
-  const h=Math.floor(m/60);
-  if(h<24) return h===1 ? "1 ora fa" : h+" ore fa";
+  const tot=Math.floor((Date.now()-ms)/60000);
+  if(tot<1) return "adesso";
+  if(tot<60) return tot+" min fa";
+  const h=Math.floor(tot/60);
+  if(h<24){ const m=tot%60; return h+"h"+(m?" "+m+"m":"")+" fa"; }
   const g=Math.floor(h/24);
   return g===1 ? "ieri" : g+" giorni fa";
 }
+/* Aggiorna in tempo reale (ogni minuto) le etichette "X fa" già a schermo,
+   senza ri-renderizzare tutta la vista (così non si perde scroll/digitazione). */
+function aggiornaRelativi(){
+  document.querySelectorAll('.ago[data-ago]').forEach(function(el){
+    const t=parseInt(el.dataset.ago,10); if(t) el.textContent=relFa(t);
+  });
+}
+setInterval(aggiornaRelativi, 60000);
+document.addEventListener("visibilitychange", function(){ if(document.visibilityState==="visible") aggiornaRelativi(); });
 
 /* ============ Macro ============ */
 const MACROS=[{id:"bebe",label:"👶 Bebè"},{id:"fare",label:"✅ Da fare"},{id:"liste",label:"🛒 Liste"},{id:"appunt",label:"📅 Agenda"},{id:"percorso",label:"🌱 Percorso"}];
@@ -844,7 +854,7 @@ function renderBebe(){
         else                      tit=(KINDS[e.kind]||KINDS.pipi).e+" "+(KINDS[e.kind]||KINDS.pipi).t;
         h += '<div class="ev tocca" data-edit="'+e.id+'"><div class="dot">'+dayShort(e.at)+'</div>'
           + '<div class="txt"><b>'+tit+'</b>'+((e.note && e.type!=="custom")?'<span>'+esc(e.note)+'</span>':'')+'</div>'
-          + '<div class="time">'+hhmm(e.at)+'<span class="ago">'+relFa(e.at)+'</span></div>'
+          + '<div class="time">'+hhmm(e.at)+'<span class="ago" data-ago="'+e.at+'">'+relFa(e.at)+'</span></div>'
           + '<button class="del" data-del="'+e.id+'">🗑</button></div>';
       });
     }
