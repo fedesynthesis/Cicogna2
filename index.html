@@ -577,7 +577,7 @@ function openEvent(type, id, catId){
             time: String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0") };
   } else {
     draft={ type:type, catId:catId||null, kind:"pipi", mode:"seno", side:"sx", date:n.date, time:n.time,
-            stato:(type==="bath"?"totale":null), dove:null, ml:"", cm:"", note:(catId==="vitd"?"4 gocce":"") };
+            stato:(type==="bath"?"totale":null), dove:null, ml:"", cm:"", note:(catId==="vitd"?"2 gocce":"") };
   }
   renderSheetEvent();
   document.getElementById("scrim").classList.add("on");
@@ -716,7 +716,7 @@ function remindersHTML(){
     const done = (state.events||[]).some(e=>e.type==="custom"&&e.catId==="vitd"&&dayKey(e.at)===today);
     h += '<div class="rem'+(done?" done":"")+'">'
       + '<div class="rem-ic">💊</div>'
-      + '<div class="rem-tx"><b>Vitamina D · 4 gocce</b><span>'+(done?"data oggi ✓":"da dare oggi a Gabriele")+'</span></div>'
+      + '<div class="rem-tx"><b>Vitamina D · 2 gocce</b><span>'+(done?"data oggi ✓":"da dare oggi a Gabriele")+'</span></div>'
       + (done ? '<button class="rem-btn ghost" data-vit="undo">Annulla</button>'
               : '<button class="rem-btn" data-vit="give">Fatto</button>')
       + '</div>';
@@ -857,7 +857,7 @@ function renderBebe(){
     const today=dayKey(Date.now());
     if(b.dataset.vit==="give"){
       if(!state.customTabs.some(t=>t.id==="vitd")) state.customTabs.push({id:"vitd", emoji:"💊", name:"Vitamina D", bg:"#ecd7ea", fg:"#874669", from:"2026-09-08"});
-      const vev={id:uid(), type:"custom", catId:"vitd", at:Date.now(), note:"4 gocce"}; state.events.unshift(vev); eventPush(vev); state.events.sort((a,b)=>b.at-a.at); state.bebeTab="c_vitd"; toast("Aggiunta al foglio Vitamina D ✓");
+      const vev={id:uid(), type:"custom", catId:"vitd", at:Date.now(), note:"2 gocce"}; state.events.unshift(vev); eventPush(vev); state.events.sort((a,b)=>b.at-a.at); state.bebeTab="c_vitd"; toast("Aggiunta al foglio Vitamina D ✓");
     }
     else { state.events.filter(x=> x.type==="custom"&&x.catId==="vitd"&&dayKey(x.at)===today).forEach(x=>{ tomb(x.id); eventRemove(x.id); }); state.events = state.events.filter(x=> !(x.type==="custom"&&x.catId==="vitd"&&dayKey(x.at)===today)); }
     save(); render();

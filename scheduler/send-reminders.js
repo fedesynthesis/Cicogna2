@@ -71,7 +71,7 @@ async function sendAll(tokens, title, body) {
   if (now.date >= VITD_START && now.hour >= HOUR && meta.vitdLast !== now.date) {
     const dataOggi = events.some(e => e && e.type === 'custom' && e.catId === 'vitd' && romeDay(e.at) === now.date);
     if (!dataOggi) {
-      await sendAll(tokens, '💊 Vitamina D di Gabri', "Ricordati le 4 gocce di oggi. Segna 'Fatto' quando l'hai data.");
+      await sendAll(tokens, '💊 Vitamina D di Gabri', "Ricordati le 2 gocce di oggi. Segna 'Fatto' quando l'hai data.");
     } else {
       console.log('Vitamina D già data oggi.');
     }
