@@ -732,7 +732,8 @@ function renderSheetEvent(){
 function feedText(e){
   if(e.mode==="seno")    return "Seno"+(e.side==="due"?" · entrambi":e.side==="dx"?" · destro":" · sinistro")+(e.min?" · "+e.min+" min":"");
   if(e.mode==="biberon") return "Biberon"+(e.ml?" · "+e.ml+" ml":"");
-  return "Solido"+(e.note?" · "+e.note:"");
+  if(e.mode==="solido")  return "Solido"+(e.note?" · "+e.note:"");
+  return "Poppata";   // voce senza dettagli (es. segnata dall'Apple Watch)
 }
 function delEvent(id){ tomb(id); eventRemove(id); state.events=state.events.filter(e=>e.id!==id); save(); render(); }
 
@@ -888,7 +889,8 @@ function renderBebe(){
           const prevEv=x.righe[gi+1];   // precedente (più vecchia) della stessa categoria
           const gap = prevEv ? '<span class="ago">⏱ '+durata(e.at-prevEv.at)+'</span>' : '';
           const daOra = (gi===0) ? '<span class="ago now" data-ago="'+e.at+'">'+faAdesso(e.at)+'</span>' : '';
-          if(e.type==="feed")       tit=(e.mode==="seno"?"🤱 ":e.mode==="biberon"?"🍼 ":"🥄 ")+feedText(e);
+          if(e.type==="feed")       tit=(e.mode==="seno"?"🤱 ":e.mode==="solido"?"🥄 ":"🍼 ")+feedText(e);
+          else if(e.type==="diaper"&&!e.kind) tit="🧷 Cambio";   // cambio senza tipo (es. dal Watch)
           else if(e.type==="vomit") tit="Vomito"+(e.amount?" · "+e.amount:"");
           else if(e.type==="cord") tit=(e.stato==="caduto"?"🎉 Cordone caduto":"Medicazione"+(e.stato?" · "+e.stato:""));
           else if(e.type==="bath") tit=(e.stato==="parziale"?"🧽 Parziale"+(e.dove?" · "+e.dove:""):"🛁 Totale · vaschetta");
@@ -1714,6 +1716,9 @@ function mergeEventsInto(incoming){
   const dele=state.deleted||{}, map={};
   (state.events||[]).forEach(e=>{ if(e&&e.id && !dele[e.id]) map[e.id]=e; });
   (incoming||[]).forEach(e=>{ if(e&&e.id && !dele[e.id]) map[e.id]=e; });   // il server vince per id
+  // Voci segnate dall'Apple Watch: arrivano con l'ora come testo ISO (atISO) e senza
+  // 'at' numerico → qui calcolo 'at' così si ordinano e si mostrano all'orario giusto.
+  Object.values(map).forEach(e=>{ if(e && e.atISO && typeof e.at!=="number"){ const t=Date.parse(e.atISO); if(!isNaN(t)) e.at=t; } });
   state.events=Object.values(map).sort((a,b)=>b.at-a.at);
   try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){}
 }
