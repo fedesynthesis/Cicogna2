@@ -221,6 +221,14 @@
   .ev.sun{background:#fff7e6;box-shadow:inset 4px 0 0 #e0a92e}
   .card.cat .ev.sun .dot{background:#e0a92e;color:#fff}
   .ev.sun .txt b{color:#8a6410}
+  .ev.sun{flex-wrap:wrap;row-gap:6px}
+  .ev .ctxrow{flex-basis:100%;padding-left:50px;font-size:11.5px;line-height:1.5;color:#7a6630}
+  .stc{display:inline-block;font-style:normal;font-family:'Quicksand';font-weight:700;font-size:10.5px;
+    padding:1px 8px;border-radius:99px;margin-right:6px;vertical-align:1px}
+  .stc.pieno{background:#fde2c8;color:#a24d0b}
+  .stc.medio{background:#f8eebf;color:#806408}
+  .stc.vuoto{background:#d9eedb;color:#2f6f3c}
+  .ev .ctxrow .cmp{display:block;margin-top:3px;font-size:11px;font-weight:600;color:#a24d0b}
   .wk{flex:none;font-family:'Quicksand';font-weight:800;font-size:15px;text-align:center;line-height:1.02;
     padding:6px 11px;border-radius:12px;min-width:66px}
   .wk small{display:block;font-family:'Inter',sans-serif;font-weight:700;font-size:9px;
@@ -843,11 +851,14 @@ function renderBebe(){
     if(!x.righe.length){
       h += '<div class="empty" style="padding:26px 16px"><span class="e">🌙</span>Ancora niente qui.<br>Tocca + per aggiungere.</div>';
     } else if(x.k==="weight"){
+      // poppate e cambi in ordine di tempo, per il contesto delle pesate domenicali
+      const feedsAsc=(state.events||[]).filter(e=>e.type==="feed"&&typeof e.at==="number").sort((a,b)=>a.at-b.at);
+      const diapAsc=(state.events||[]).filter(e=>e.type==="diaper"&&typeof e.at==="number").sort((a,b)=>a.at-b.at);
       x.righe.slice(0,40).forEach((it,i)=>{
         const prev=x.righe[i+1];
         const diff=prev ? (it.kg>=prev.kg?"+":"−")+Math.abs(Math.round((it.kg-prev.kg)*1000))+" g" : "prima pesata";
         const isSun = new Date(it.at).getDay()===0;   // domenica = 0
-        let right;
+        let right, ctxH='';
         if(isSun){
           // incremento rispetto alla DOMENICA precedente (salta le pesate infrasettimanali)
           const dk=dayKey(it.at); let ps=null;
@@ -856,13 +867,24 @@ function renderBebe(){
           if(ps){ const g=Math.round((it.kg-ps.kg)*1000);
             right='<div class="wk '+(g>=0?'up':'down')+'">'+(g>=0?'+':'−')+Math.abs(g)+' g<small>settimana</small></div>';
           } else { right='<div class="wk first">1ª<small>domenica</small></div>'; }
+          // contesto: pancia piena / a metà / vuota + pannolino, e avviso se il confronto è falsato
+          const c=ctxPesata(oraPesata(it), feedsAsc, diapAsc);
+          if(c){
+            const cp = ps ? ctxPesata(oraPesata(ps), feedsAsc, diapAsc) : null;
+            let avviso='';
+            if(cp && (c.stato==="pieno") !== (cp.stato==="pieno"))
+              avviso = c.stato==="pieno" ? '⚠︎ aumento forse gonfiato (oggi pancia piena, domenica scorsa no)'
+                                         : '⚠︎ aumento forse sottostimato (domenica scorsa pancia piena)';
+            ctxH='<div class="ctxrow"><i class="stc '+c.stato+'">'+c.nome+'</i>'+c.quando+' · '+c.pann
+              + (avviso?'<span class="cmp">'+avviso+'</span>':'')+'</div>';
+          }
         } else {
           right='<div class="time">'+diff+'</div>';
         }
         h += '<div class="ev tocca'+(isSun?' sun':'')+'" data-wedit="'+it.id+'"><div class="dot">'+(isSun?'🗓️':'⚖️')+'</div>'
           + '<div class="txt"><b>'+fmtKg(it.kg)+' kg</b><span>'+(isSun?'Domenica · ':'')+fmtDate(it.at)+" · "+hhmm(oraPesata(it))+(it.note?" · "+esc(it.note):"")+'</span></div>'
           + right
-          + '<button class="del" data-wdel="'+it.id+'">🗑</button></div>';
+          + '<button class="del" data-wdel="'+it.id+'">🗑</button>'+ctxH+'</div>';
       });
     } else {
       // Albero per MESE (lista già ordinata dal più recente). Ogni mese è un'intestazione
@@ -981,6 +1003,23 @@ function oraPesata(w){
     if(t>1.4e12 && t<2e12 && dayKey(t)===dayKey(w.at)) return t;
   }
   return w.at;
+}
+/* Contesto di una pesata (solo domenicali): quanto tempo dopo la FINE dell'ultima
+   poppata e se il pannolino era stato cambiato dopo → per capire se il peso era
+   "gonfiato" dalla pancia piena. feeds/diaps già ordinati per ora crescente. */
+function ctxPesata(T, feeds, diaps){
+  let lf=null;
+  for(let k=feeds.length-1;k>=0;k--){ if(feeds[k].at<=T){ lf=feeds[k]; break; } }
+  if(!lf || T-lf.at>12*3600000) return null;              // nessuna poppata nelle 12h prima
+  const fine = lf.at + (lf.mode==="seno" && lf.min ? lf.min*60000 : 0);
+  const mins = Math.max(0, Math.round((T-fine)/60000));
+  const dopo = diaps.filter(d=> d.at>lf.at && d.at<=T);
+  const pupu = dopo.some(d=> d.kind==="pupu"||d.kind==="both");
+  const stato = mins<60 ? "pieno" : mins>=150 ? "vuoto" : "medio";
+  return { stato, mins,
+    nome: {pieno:"pancia piena", medio:"a metà", vuoto:"pancia vuota"}[stato],
+    quando: mins<1 ? "🍼 appena mangiato" : "🍼 poppata "+durata(mins*60000)+" prima",
+    pann: pupu ? "💩 scaricato dopo" : dopo.length ? "💧 cambiato dopo" : "nessun cambio segnato" };
 }
 function openWeight(id){
   const s=document.getElementById("sheet");
