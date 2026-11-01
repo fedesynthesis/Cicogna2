@@ -860,7 +860,7 @@ function renderBebe(){
           right='<div class="time">'+diff+'</div>';
         }
         h += '<div class="ev tocca'+(isSun?' sun':'')+'" data-wedit="'+it.id+'"><div class="dot">'+(isSun?'🗓️':'⚖️')+'</div>'
-          + '<div class="txt"><b>'+fmtKg(it.kg)+' kg</b><span>'+(isSun?'Domenica · ':'')+fmtDate(it.at)+" · "+hhmm(it.at)+(it.note?" · "+esc(it.note):"")+'</span></div>'
+          + '<div class="txt"><b>'+fmtKg(it.kg)+' kg</b><span>'+(isSun?'Domenica · ':'')+fmtDate(it.at)+" · "+hhmm(oraPesata(it))+(it.note?" · "+esc(it.note):"")+'</span></div>'
           + right
           + '<button class="del" data-wdel="'+it.id+'">🗑</button></div>';
       });
@@ -971,15 +971,30 @@ function renderBebe(){
 /* ---- Peso ---- */
 function fmtKg(kg){ return (Math.round(kg*1000)/1000).toString().replace(".",","); }
 function fmtDate(ms){ return new Intl.DateTimeFormat("it-IT",{day:"numeric",month:"long",year:"numeric"}).format(new Date(ms)); }
+/* Ora reale di una pesata: le vecchie pesate erano salvate col default 12:00 (il form
+   chiedeva solo il giorno) → la recupero dall'ID, che contiene il momento in cui l'hai
+   creata (stesso giorno della pesata). Per le pesate nuove (con ora vera) uso quella. */
+function oraPesata(w){
+  const d=new Date(w.at);
+  if(d.getHours()===12 && d.getMinutes()===0){
+    const t=parseInt(String(w.id||"").slice(0,-4),36);
+    if(t>1.4e12 && t<2e12 && dayKey(t)===dayKey(w.at)) return t;
+  }
+  return w.at;
+}
 function openWeight(id){
   const s=document.getElementById("sheet");
   const w0 = id ? state.weights.find(x=>x.id===id) : null;
   const base = w0 ? new Date(w0.at) : new Date();
   const iso=base.getFullYear()+"-"+String(base.getMonth()+1).padStart(2,"0")+"-"+String(base.getDate()).padStart(2,"0");
+  const tb = w0 ? new Date(oraPesata(w0)) : new Date();   // ora (recuperata per le vecchie)
+  const hm = String(tb.getHours()).padStart(2,"0")+":"+String(tb.getMinutes()).padStart(2,"0");
   s.innerHTML =
-    '<h3>'+(w0?"Modifica pesata":"Pesata")+'</h3><div class="hint">Peso e giorno della misurazione</div>'
+    '<h3>'+(w0?"Modifica pesata":"Pesata")+'</h3><div class="hint">Peso, giorno e ora della misurazione</div>'
     + '<div class="lbl">Peso</div><div class="fld"><input id="wkg" type="number" inputmode="decimal" step="0.01" placeholder="es. 3,45" value="'+(w0?w0.kg:"")+'"><span class="u">kg</span></div>'
-    + '<div class="lbl">Giorno</div><div class="fld"><input id="wdate" type="date" value="'+iso+'"></div>'
+    + '<div class="lbl">Giorno e ora</div>'
+    + '<div class="opts"><div class="fld" style="flex:1.4"><input id="wdate" type="date" value="'+iso+'"></div>'
+    + '<div class="fld" style="flex:1"><input id="wtime" type="time" value="'+hm+'"></div></div>'
     + '<div class="lbl">Nota</div><div class="fld"><input id="wnote" type="text" placeholder="es. visita dal pediatra" value="'+esc(w0?(w0.note||""):"")+'"></div>'
     + '<button class="go" id="wgo">'+(w0?"Salva modifiche":"Registra pesata")+'</button>'
     + '<button class="cancel" id="wcancel">Annulla</button>';
@@ -988,7 +1003,8 @@ function openWeight(id){
     const kg=parseFloat(String(s.querySelector("#wkg").value).replace(",","."));
     if(!kg || kg<=0){ toast("Scrivi il peso"); return; }
     const d=s.querySelector("#wdate").value;
-    const at=d ? new Date(d+"T12:00").getTime() : Date.now();
+    const tm=(s.querySelector("#wtime").value)||"12:00";
+    const at=d ? new Date(d+"T"+tm).getTime() : Date.now();
     const nota=s.querySelector("#wnote").value.trim();
     if(w0){ state.weights=state.weights.map(x=> x.id===w0.id ? {id:w0.id, kg:kg, at:at, note:nota} : x); }
     else { const nw={id:uid(), kg:kg, at:at, note:nota}; state.weights.unshift(nw); cloudFastAdd("weights", nw); }
