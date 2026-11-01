@@ -210,6 +210,13 @@
   .ev .time .ago{font-family:'Inter',sans-serif;font-weight:500;font-size:10.5px;color:var(--ink-soft);opacity:.65;margin-top:2px;white-space:nowrap}
   .ev .time .ago.now{color:var(--cat,var(--sage));opacity:.95;font-weight:600}
   .ev .del{border:none;background:none;font-size:16px;padding:4px;cursor:pointer;opacity:.5}
+  .mese-head{display:flex;align-items:center;gap:10px;width:100%;border:none;background:rgba(255,255,255,.5);
+    color:var(--cat,var(--ink));padding:12px 16px;cursor:pointer;font-family:'Quicksand';font-weight:700;font-size:14px;
+    border-top:1px solid var(--line)}
+  .mese-head.on{background:rgba(255,255,255,.72)}
+  .mese-chev{font-size:11px;width:12px;flex:none;opacity:.75}
+  .mese-nome{flex:1;text-align:left;text-transform:capitalize}
+  .mese-cnt{font-size:11.5px;font-weight:700;background:var(--cat,var(--sage));color:#fff;border-radius:99px;padding:2px 10px;opacity:.92;flex:none}
   /* pesata di DOMENICA: riga evidenziata (checkpoint settimanale) */
   .ev.sun{background:#fff7e6;box-shadow:inset 4px 0 0 #e0a92e}
   .card.cat .ev.sun .dot{background:#e0a92e;color:#fff}
@@ -564,6 +571,10 @@ function aggiornaRelativi(){
 }
 setInterval(aggiornaRelativi, 60000);
 document.addEventListener("visibilitychange", function(){ if(document.visibilityState==="visible") aggiornaRelativi(); });
+/* Nome mese leggibile da una chiave "AAAA-MM": "Novembre 2026". */
+function nomeMese(mk){ const p=mk.split("-"); const nm=new Intl.DateTimeFormat("it-IT",{month:"long"}).format(new Date(+p[0],+p[1]-1,1)); return nm.charAt(0).toUpperCase()+nm.slice(1)+" "+p[0]; }
+/* Stato apri/chiudi dei mesi nell'albero, per categoria+mese (solo in sessione). */
+let mesiAperti={};
 
 /* ============ Macro ============ */
 const MACROS=[{id:"bebe",label:"👶 Bebè"},{id:"fare",label:"✅ Da fare"},{id:"liste",label:"🛒 Liste"},{id:"appunt",label:"📅 Agenda"},{id:"percorso",label:"🌱 Percorso"}];
@@ -848,30 +859,49 @@ function renderBebe(){
           right='<div class="time">'+diff+'</div>';
         }
         h += '<div class="ev tocca'+(isSun?' sun':'')+'" data-wedit="'+it.id+'"><div class="dot">'+(isSun?'🗓️':'⚖️')+'</div>'
-          + '<div class="txt"><b>'+fmtKg(it.kg)+' kg</b><span>'+(isSun?'Domenica · ':'')+fmtDate(it.at)+(it.note?" · "+esc(it.note):"")+'</span></div>'
+          + '<div class="txt"><b>'+fmtKg(it.kg)+' kg</b><span>'+(isSun?'Domenica · ':'')+fmtDate(it.at)+" · "+hhmm(it.at)+(it.note?" · "+esc(it.note):"")+'</span></div>'
           + right
           + '<button class="del" data-wdel="'+it.id+'">🗑</button></div>';
       });
     } else {
-      x.righe.slice(0,60).forEach((e,i)=>{
-        let tit;
-        const prevEv=x.righe[i+1];   // la voce precedente (più vecchia) della stessa categoria
-        const gap = prevEv ? '<span class="ago">⏱ '+durata(e.at-prevEv.at)+'</span>' : '';
-        // solo sull'ULTIMA attività (la più recente): quanto tempo da allora a ora
-        const daOra = (i===0) ? '<span class="ago now" data-ago="'+e.at+'">'+faAdesso(e.at)+'</span>' : '';
-        if(e.type==="feed")       tit=(e.mode==="seno"?"🤱 ":e.mode==="biberon"?"🍼 ":"🥄 ")+feedText(e);
-        else if(e.type==="vomit") tit="Vomito"+(e.amount?" · "+e.amount:"");
-        else if(e.type==="cord") tit=(e.stato==="caduto"?"🎉 Cordone caduto":"Medicazione"+(e.stato?" · "+e.stato:""));
-        else if(e.type==="bath") tit=(e.stato==="parziale"?"🧽 Parziale"+(e.dove?" · "+e.dove:""):"🛁 Totale · vaschetta");
-        else if(e.type==="pump"){ const L=e.side==="dx"?"Destro":e.side==="due"?"Entrambi":e.side==="sx"?"Sinistro":""; tit="🥛 "+(L||"Tiralatte")+(e.ml?" · "+e.ml+" ml":""); }
-        else if(e.type==="length") tit="📏 "+(e.cm?e.cm+" cm":"misura");
-        else if(e.type==="foot") tit="👣 "+(e.cm?e.cm+" cm":"misura");
-        else if(e.type==="custom") tit=(e.note?e.note:"Registrato");
-        else                      tit=(KINDS[e.kind]||KINDS.pipi).e+" "+(KINDS[e.kind]||KINDS.pipi).t;
-        h += '<div class="ev tocca" data-edit="'+e.id+'"><div class="dot">'+dayShort(e.at)+'</div>'
-          + '<div class="txt"><b>'+tit+'</b>'+((e.note && e.type!=="custom")?'<span>'+esc(e.note)+'</span>':'')+'</div>'
-          + '<div class="time">'+hhmm(e.at)+daOra+gap+'</div>'
-          + '<button class="del" data-del="'+e.id+'">🗑</button></div>';
+      // Albero per MESE (lista già ordinata dal più recente). Ogni mese è un'intestazione
+      // apri/chiudi; dentro, gli eventi del mese. Intervalli/‘da adesso’ sull'indice GLOBALE.
+      const gruppi=[], idxM={};
+      x.righe.forEach((e,gi)=>{
+        const d=new Date(e.at), mk=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
+        if(!(mk in idxM)){ idxM[mk]=gruppi.length; gruppi.push({mk, items:[]}); }
+        gruppi[idxM[mk]].items.push(gi);
+      });
+      gruppi.forEach((g,mgi)=>{
+        const key=x.k+"|"+g.mk;
+        let aperto;
+        if(key in mesiAperti) aperto=mesiAperti[key];
+        else { aperto=(mgi===0); mesiAperti[key]=aperto; }   // il mese più recente aperto di default
+        h += '<button class="mese-head'+(aperto?' on':'')+'" data-mese="'+esc(key)+'">'
+          + '<span class="mese-chev">'+(aperto?'▾':'▸')+'</span>'
+          + '<span class="mese-nome">'+nomeMese(g.mk)+'</span>'
+          + '<span class="mese-cnt">'+g.items.length+'</span></button>';
+        if(!aperto) return;
+        g.items.forEach(gi=>{
+          const e=x.righe[gi];
+          let tit;
+          const prevEv=x.righe[gi+1];   // precedente (più vecchia) della stessa categoria
+          const gap = prevEv ? '<span class="ago">⏱ '+durata(e.at-prevEv.at)+'</span>' : '';
+          const daOra = (gi===0) ? '<span class="ago now" data-ago="'+e.at+'">'+faAdesso(e.at)+'</span>' : '';
+          if(e.type==="feed")       tit=(e.mode==="seno"?"🤱 ":e.mode==="biberon"?"🍼 ":"🥄 ")+feedText(e);
+          else if(e.type==="vomit") tit="Vomito"+(e.amount?" · "+e.amount:"");
+          else if(e.type==="cord") tit=(e.stato==="caduto"?"🎉 Cordone caduto":"Medicazione"+(e.stato?" · "+e.stato:""));
+          else if(e.type==="bath") tit=(e.stato==="parziale"?"🧽 Parziale"+(e.dove?" · "+e.dove:""):"🛁 Totale · vaschetta");
+          else if(e.type==="pump"){ const L=e.side==="dx"?"Destro":e.side==="due"?"Entrambi":e.side==="sx"?"Sinistro":""; tit="🥛 "+(L||"Tiralatte")+(e.ml?" · "+e.ml+" ml":""); }
+          else if(e.type==="length") tit="📏 "+(e.cm?e.cm+" cm":"misura");
+          else if(e.type==="foot") tit="👣 "+(e.cm?e.cm+" cm":"misura");
+          else if(e.type==="custom") tit=(e.note?e.note:"Registrato");
+          else                      tit=(KINDS[e.kind]||KINDS.pipi).e+" "+(KINDS[e.kind]||KINDS.pipi).t;
+          h += '<div class="ev tocca" data-edit="'+e.id+'"><div class="dot">'+dayShort(e.at)+'</div>'
+            + '<div class="txt"><b>'+tit+'</b>'+((e.note && e.type!=="custom")?'<span>'+esc(e.note)+'</span>':'')+'</div>'
+            + '<div class="time">'+hhmm(e.at)+daOra+gap+'</div>'
+            + '<button class="del" data-del="'+e.id+'">🗑</button></div>';
+        });
       });
     }
     h += '</div>';
@@ -933,6 +963,7 @@ function renderBebe(){
   v.querySelectorAll("[data-wdel]").forEach(b=> tapSubito(b, (e)=>{ if(e&&e.stopPropagation) e.stopPropagation(); const id=b.dataset.wdel;
     askConfirm("Vuoi eliminare questa pesata?", ()=>{ tomb(id); state.weights=state.weights.filter(z=>z.id!==id); save(); render(); });
   }));
+  v.querySelectorAll("[data-mese]").forEach(b=> tapSubito(b, ()=>{ const k=b.dataset.mese; mesiAperti[k]=!mesiAperti[k]; conservaCampi(render); }));
 }
 
 /* ---- Peso ---- */
