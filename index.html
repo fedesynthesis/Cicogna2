@@ -1013,13 +1013,22 @@ function ctxPesata(T, feeds, diaps){
   if(!lf || T-lf.at>12*3600000) return null;              // nessuna poppata nelle 12h prima
   const fine = lf.at + (lf.mode==="seno" && lf.min ? lf.min*60000 : 0);
   const mins = Math.max(0, Math.round((T-fine)/60000));
+  // Il cambio fatto "insieme" alla pesata (togli il pannolino, pesi nudo, registri) può
+  // finire registrato qualche minuto PRIMA o DOPO: entro 15 min conta come pesato dopo.
+  const TOLL=15*60000;
+  const insieme = diaps.filter(d=> d.at>lf.at && Math.abs(d.at-T)<=TOLL);
   const dopo = diaps.filter(d=> d.at>lf.at && d.at<=T);
-  const pupu = dopo.some(d=> d.kind==="pupu"||d.kind==="both");
+  const tipo = arr => { const pu=arr.some(d=>d.kind==="pupu"||d.kind==="both"), pi=arr.some(d=>d.kind==="pipi"||d.kind==="both");
+    return pu&&pi ? "pipì e pupù" : pu ? "la pupù" : pi ? "la pipì" : "il cambio"; };
+  let pann;
+  if(insieme.length){ const t=tipo(insieme); pann=(t.includes("pupù")?"💩":t==="il cambio"?"🧷":"💧")+" pesato dopo "+t; }
+  else if(dopo.length){ const t=tipo(dopo); pann=(t.includes("pupù")?"💩 pupù":"💧 cambio")+" dopo la poppata"; }
+  else pann="nessun cambio segnato";
   const stato = mins<60 ? "pieno" : mins>=150 ? "vuoto" : "medio";
   return { stato, mins,
     nome: {pieno:"pancia piena", medio:"a metà", vuoto:"pancia vuota"}[stato],
     quando: mins<1 ? "🍼 appena mangiato" : "🍼 poppata "+durata(mins*60000)+" prima",
-    pann: pupu ? "💩 scaricato dopo" : dopo.length ? "💧 cambiato dopo" : "nessun cambio segnato" };
+    pann };
 }
 function openWeight(id){
   const s=document.getElementById("sheet");
