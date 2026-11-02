@@ -157,8 +157,10 @@
   .reord-row{display:flex;align-items:center;gap:12px;background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:10px 12px}
   .re-ic{font-size:22px;width:34px;text-align:center;flex:none}
   .re-nm{flex:1;min-width:0;font-family:'Quicksand';font-weight:600;font-size:15px}
-  .re-btn{border:1.5px solid var(--line);background:var(--surface);border-radius:10px;width:40px;height:40px;
-    font-size:15px;cursor:pointer;flex:none;color:var(--ink)}
+  .re-btn{border:1.5px solid var(--line);background:var(--surface);border-radius:10px;width:44px;height:44px;
+    font-size:15px;cursor:pointer;flex:none;color:var(--ink);touch-action:manipulation;-webkit-user-select:none;user-select:none}
+  .reord-row.mosso{animation:mosso .7s ease-out}
+  @keyframes mosso{from{background:var(--sage-bg);border-color:var(--sage-soft)}to{background:var(--bg);border-color:var(--line)}}
   .re-btn:disabled{opacity:.3}
   .re-btn:active:not(:disabled){background:var(--sage-bg)}
   .icgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:6px}
@@ -465,6 +467,7 @@ state.open   = state.open   || {};
 state.openBebe= state.openBebe|| {};
 state.customTabs = state.customTabs || [];  // schede aggiunte da noi: {id,emoji,name,bg,fg,from?}
 state.tabOrder = state.tabOrder || [];  // ordine delle schede (chiavi) scelto da noi
+state.tabOrderU = +state.tabOrderU || 0; // quando è stato cambiato l'ordine (vince il più recente tra i telefoni)
 state.deleted = state.deleted || {};    // tombstone: {id: timestamp} degli elementi cancellati
 state.docs = state.docs || [];          // metadati documenti condivisi: {id,name,type,size,at,sp} (file su Storage)
 state.numbers = state.numbers || [];    // numeri utili: {id, name, tel, at}
@@ -1240,12 +1243,15 @@ function apptDelete(id){ tomb(id); state.appts=(state.appts||[]).filter(x=>x.id!
 /* Il tasto deve rispondere al primo tocco anche con la tastiera aperta.
    NB: bloccare il pointerdown impedisce del tutto il click su iOS: qui si agisce
    al sollevamento del dito, con una guardia contro il doppio scatto. */
+/* NB: il 'click' che segue un tocco già gestito va ignorato ANCHE se cade su un
+   tasto nuovo: se il pointerup ridisegna (es. ▲▼ dell'ordine schede), iOS consegna
+   il click al tasto che ora sta sotto il dito → secondo scatto che annullava il primo. */
+let tapUltimoPU=0;
 function tapSubito(btn, fn){
   if(!btn) return;
   let ultimo=0;
-  const run=(e)=>{ const ora=Date.now(); if(ora-ultimo<400) return; ultimo=ora; fn(e); };
-  btn.addEventListener("pointerup", run);
-  btn.addEventListener("click", run);
+  btn.addEventListener("pointerup", (e)=>{ const ora=Date.now(); if(ora-ultimo<350) return; ultimo=ora; tapUltimoPU=ora; fn(e); });
+  btn.addEventListener("click", (e)=>{ const ora=Date.now(); if(ora-tapUltimoPU<700 || ora-ultimo<400) return; ultimo=ora; fn(e); });
 }
 
 /* ---- Schedine di inserimento (stesso meccanismo della sezione Bebè) ---- */
@@ -1343,7 +1349,7 @@ function enableTabDrag(container){
       document.removeEventListener("pointercancel",end,true);
       container.style.overflowX=prevOverflow||"auto";
       el.classList.remove("dragging");
-      state.tabOrder = tabs().map(t=>t.dataset.tab); save();
+      state.tabOrder = tabs().map(t=>t.dataset.tab); state.tabOrderU=Date.now(); save();
       tabJustDragged=Date.now();
       render();
     };
@@ -1379,23 +1385,24 @@ function moveTab(k, dir){
   const i=list.indexOf(k), j=i+dir;
   if(i<0 || j<0 || j>=list.length) return;
   const tmp=list[i]; list[i]=list[j]; list[j]=tmp;
-  state.tabOrder=list; save();
+  state.tabOrder=list; state.tabOrderU=Date.now(); save();   // tabOrderU: l'ordine più RECENTE vince nella sync (prima vinceva sempre quello del cloud → lo spostamento tornava indietro)
 }
 function openReorder(){
   const s=document.getElementById("sheet");
-  const draw=()=>{
-    const list=currentTabList();
+  const draw=(mosso)=>{
+    const list=currentTabList(), scroll=s.scrollTop;
     s.innerHTML = '<h3>Ordina le schede</h3><div class="hint">In alto = più a sinistra nella striscia</div>'
       + '<div class="reord">'
-      + list.map((t,i)=> '<div class="reord-row">'
+      + list.map((t,i)=> '<div class="reord-row'+(t.k===mosso?' mosso':'')+'">'
           + '<span class="re-ic">'+t.emoji+'</span><span class="re-nm">'+esc(t.name)+'</span>'
           + '<button class="re-btn" data-up="'+t.k+'"'+(i===0?" disabled":"")+'>▲</button>'
           + '<button class="re-btn" data-dn="'+t.k+'"'+(i===list.length-1?" disabled":"")+'>▼</button>'
           + '</div>').join("")
       + '</div>'
       + '<button class="go" id="reok">Fatto</button>';
-    s.querySelectorAll("[data-up]").forEach(b=> tapSubito(b, (e)=>{ if(e&&e.stopPropagation)e.stopPropagation(); moveTab(b.dataset.up,-1); draw(); }));
-    s.querySelectorAll("[data-dn]").forEach(b=> tapSubito(b, (e)=>{ if(e&&e.stopPropagation)e.stopPropagation(); moveTab(b.dataset.dn,+1); draw(); }));
+    s.scrollTop=scroll;   // resto dove ero (non risalgo in cima ad ogni tocco)
+    s.querySelectorAll("[data-up]").forEach(b=> tapSubito(b, (e)=>{ if(e&&e.stopPropagation)e.stopPropagation(); moveTab(b.dataset.up,-1); draw(b.dataset.up); }));
+    s.querySelectorAll("[data-dn]").forEach(b=> tapSubito(b, (e)=>{ if(e&&e.stopPropagation)e.stopPropagation(); moveTab(b.dataset.dn,+1); draw(b.dataset.dn); }));
     s.querySelector("#reok").onclick=()=>{ document.getElementById("scrim").classList.remove("on"); render(); };
   };
   draw();
@@ -1716,7 +1723,7 @@ const FB_CONFIG={
 /* Le regole del progetto autorizzano solo questo documento: ci scriviamo dentro i nostri
    campi SENZA toccare quelli della vecchia lista nascita (vedi merge:true più sotto). */
 const ROOM_COL="LL09Rb8OO0yjHQnJBsPCPSu1", ROOM_DOC="YXZm9MNsAFCNNQiTgQnU7LEg";
-const SYNC_KEYS=["events","tasks","lists","weights","customTabs","docs","numbers","appts","weighDone","tabOrder","deleted"];
+const SYNC_KEYS=["events","tasks","lists","weights","customTabs","docs","numbers","appts","weighDone","tabOrder","tabOrderU","deleted"];
 const SYNC_INIT="nido_sync_init";
 const VAPID_KEY="BODxg7pjZvTAAfLUJrWec-SyHYxP_HUCanzRWyBybOqDLW2USFYhkAnPh3nXyl-VWRfpExHtgX1BoahF2F_4Mak";  // Web Push cicogna-57ae0
 let FB=null, fdoc=null, fbReady=false, pendingWrite=false, dirty=false, pushTimer=null, registerPush=null;
@@ -1743,6 +1750,7 @@ function needsPush(m, server){
   const s=allIds(server), a=allIds(m); for(const id of a) if(!s.has(id)) return true;
   const sd=server.deleted||{}, md=m.deleted||{}; for(const id in md) if(!(id in sd)) return true;
   const sw=new Set(server.weighDone||[]); for(const d of (m.weighDone||[])) if(!sw.has(d)) return true;
+  if((+m.tabOrderU||0) > (+server.tabOrderU||0)) return true;   // ho riordinato le schede: va pubblicato
   return false;
 }
 function scheduleCloudPush(){
@@ -1787,33 +1795,117 @@ function cloudFastAdd(field, obj){
 /* ===== EVENTI in sottocollezione (nido .../events/{id}) =====
    Ogni voce del diario è un documento a sé: scrittura minuscola e istantanea
    (parte anche se blocchi il telefono subito dopo) e niente tetto di 1MB. */
+/* RISPARMIO LETTURE (v74): prima l'ascoltatore leggeva TUTTE le schedine (~1300, +25 al
+   giorno) ad ogni apertura dell'app → quota giornaliera gratuita di Firebase esaurita.
+   Ora ogni schedina scritta porta 'u' = ora del SERVER, e ascolto solo quelle con
+   'u' più recente dell'ultima che ho già visto (nido_ev_maxU): poche letture a volta.
+   Le mie scritture passano da una CODA (nido_ev_outbox) svuotata solo quando il server
+   conferma: se chiudo l'app o sono offline, alla riapertura le ripeto (sostituisce la
+   vecchia "auto-guarigione" che confrontava con l'elenco completo del server). */
+const EV_MAXU="nido_ev_maxU", EV_OUTBOX="nido_ev_outbox";
+const EV_TRANSIZIONE_FINO=new Date("2026-11-20T00:00:00").getTime();   // finché un telefono può essere ancora su v73 (scrive senza 'u')
+let evUnsub=[], evSubAt=0, evFull=false, evRetry=null;
+const evInVolo=new Set();          // scritture partite in questa sessione e non ancora confermate
 function eventRef(id){ return FB.doc(fdb, ROOM_COL, ROOM_DOC, "events", String(id)); }
-function eventPush(ev){            // aggiunta E modifica: riscrive quella singola schedina
-  if(!fbReady || !EVENTS_COL || !FB.setDoc || !ev || !ev.id) return;
-  try{ FB.setDoc(eventRef(ev.id), ev); }catch(e){ console.warn("eventPush", e); }
+function evDoc(ev){ const d=JSON.parse(JSON.stringify(ev)); d.u=FB.serverTimestamp(); return d; }   // niente 'undefined' (Firestore li rifiuta) + ora del server
+function outboxGet(){ try{ return JSON.parse(localStorage.getItem(EV_OUTBOX)||"{}")||{}; }catch(e){ return {}; } }
+function outboxSet(o){ try{ localStorage.setItem(EV_OUTBOX, JSON.stringify(o)); }catch(e){} }
+function outboxAdd(id, op){ const o=outboxGet(), t=Date.now()+Math.random(); o[id]={op, t}; outboxSet(o); return t; }
+function outboxDone(id, t){ const o=outboxGet(); if(o[id] && o[id].t===t){ delete o[id]; outboxSet(o); } }   // tolgo solo se nel frattempo non c'è una modifica più nuova
+function evInvia(id, t, op, ev){
+  if(!fbReady || !EVENTS_COL || !FB.setDoc) return;   // sync non pronta: resta in coda, parte all'avvio
+  evInVolo.add(id);
+  const fine=()=>{ evInVolo.delete(id); };
+  try{
+    const p = op==="del" ? FB.deleteDoc(eventRef(id)) : FB.setDoc(eventRef(id), evDoc(ev));
+    p.then(()=>{ fine(); outboxDone(id, t); }, (e)=>{ fine(); console.warn("evento cloud", op, e); });
+  }catch(e){ fine(); console.warn("evento cloud", op, e); }
 }
-function eventRemove(id){          // cancellazione: toglie la schedina dal cloud
-  if(!fbReady || !EVENTS_COL || !FB.deleteDoc || !id) return;
-  try{ FB.deleteDoc(eventRef(id)); }catch(e){ console.warn("eventRemove", e); }
+function eventPush(ev){            // aggiunta E modifica: riscrive quella singola schedina
+  if(!ev || !ev.id) return;
+  evInvia(ev.id, outboxAdd(ev.id, "set"), "set", ev);
+}
+function eventRemove(id){          // cancellazione: toglie la schedina dal cloud (la tombstone nel documento resta la garanzia)
+  if(!id) return;
+  evInvia(id, outboxAdd(id, "del"), "del");
+}
+/* Riprovo le scritture rimaste in coda (app chiusa prima della conferma, offline…). */
+function outboxFlush(){
+  if(!fbReady || !EVENTS_COL) return;
+  const o=outboxGet(), dele=state.deleted||{};
+  Object.keys(o).forEach(id=>{
+    if(evInVolo.has(id)) return;                                   // già in viaggio: ci pensa Firestore
+    const t=o[id].t;
+    if(o[id].op==="del" || dele[id]){ evInvia(id, t, "del"); return; }
+    const ev=(state.events||[]).find(e=>e&&e.id===id);
+    if(!ev){ outboxDone(id, t); return; }                          // non esiste più in locale: niente da scrivere
+    evInvia(id, t, "set", ev);
+  });
 }
 /* Fusione in lettura: unisco per id gli eventi del server a quelli locali, scarto i
    cancellati (tombstone), ordino. ADDITIVA: non butta via nulla già presente. */
 function mergeEventsInto(incoming){
-  const dele=state.deleted||{}, map={};
+  const dele=state.deleted||{}, map={}, ob=outboxGet();
   (state.events||[]).forEach(e=>{ if(e&&e.id && !dele[e.id]) map[e.id]=e; });
-  (incoming||[]).forEach(e=>{ if(e&&e.id && !dele[e.id]) map[e.id]=e; });   // il server vince per id
+  (incoming||[]).forEach(e=>{ if(e&&e.id && !dele[e.id] && !(ob[e.id] && map[e.id])) map[e.id]=e; });   // il server vince per id, tranne se ho una mia modifica non ancora confermata
   // Voci segnate dall'Apple Watch: arrivano con l'ora come testo ISO (atISO) e senza
   // 'at' numerico → qui calcolo 'at' così si ordinano e si mostrano all'orario giusto.
   Object.values(map).forEach(e=>{ if(e && e.atISO && typeof e.at!=="number"){ const t=Date.parse(e.atISO); if(!isNaN(t)) e.at=t; } });
   state.events=Object.values(map).sort((a,b)=>b.at-a.at);
   try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){}
 }
-/* Auto-guarigione: se ho in locale eventi che il server non ha ancora (aggiunta
-   fatta offline o scrittura lampo non partita), li ripubblico nella sottocollezione. */
-function healEvents(serverEvents){
-  if(!fbReady || !EVENTS_COL || !FB.setDoc) return;
-  const srv=new Set((serverEvents||[]).map(e=>e&&e.id)); const dele=state.deleted||{};
-  (state.events||[]).forEach(e=>{ if(e&&e.id && !srv.has(e.id) && !dele[e.id]) eventPush(e); });
+/* Converte le schedine lette dal server: tolgo 'u' (resta solo sul cloud) e avanzo
+   il segnalibro maxU con quelle già confermate dal server. */
+function evDaSnapshot(snap){
+  let mu=+localStorage.getItem(EV_MAXU)||0;
+  const evs=snap.docs.map(d=>{
+    const x=d.data();
+    if(x.u && typeof x.u.toMillis==="function" && !d.metadata.hasPendingWrites) mu=Math.max(mu, x.u.toMillis());
+    delete x.u; return x;
+  });
+  if(!snap.metadata.fromCache){ try{ localStorage.setItem(EV_MAXU, String(mu)); }catch(e){} }
+  return evs;
+}
+/* Ascolto "a finestra": solo le schedine scritte dopo l'ultima già vista (meno 10 min
+   di margine). Riparto da capo ogni tanto, così la finestra resta piccola anche se
+   l'app resta aperta per giorni. */
+function subscribeEvents(){
+  if(!fbReady || !EVENTS_COL || !FB.query || !FB.where || !FB.Timestamp) return;
+  evUnsub.forEach(f=>{ try{ f(); }catch(e){} }); evUnsub=[];
+  evSubAt=Date.now();
+  const maxU=+localStorage.getItem(EV_MAXU)||0;
+  const da=FB.Timestamp.fromMillis(Math.max(0, maxU-10*60000));
+  const onSnap=(snap)=>{
+    if(snap.metadata.fromCache && !snap.docs.length) return;     // ancora niente dal server
+    const evs=evDaSnapshot(snap);
+    if(evs.length){ mergeEventsInto(evs); conservaCampi(render); }
+  };
+  const onErr=(err)=>{ console.warn("Sync eventi:", err);
+    const code=err&&err.code;
+    // query a finestra rifiutata (indice mancante): ripiego sulla lettura completa, meglio letture in più che eventi persi
+    if((code==="failed-precondition"||code==="invalid-argument") && !evFull){ evFull=true; subscribeEvents(); return; }
+    clearTimeout(evRetry);   // altro errore (rete, quota…): riprovo tra un po' se l'app è aperta
+    evRetry=setTimeout(()=>{ if(document.visibilityState==="visible") subscribeEvents(); }, 60000);
+  };
+  if(evFull){ evUnsub.push(FB.onSnapshot(EVENTS_COL, onSnap, onErr)); return; }
+  evUnsub.push(FB.onSnapshot(FB.query(EVENTS_COL, FB.where("u", ">=", da)), {includeMetadataChanges:true}, onSnap, onErr));
+  // TRANSIZIONE: un telefono ancora su v73 scrive senza 'u' → prendo anche gli ultimi 3 giorni per data evento
+  if(Date.now() < EV_TRANSIZIONE_FINO)
+    evUnsub.push(FB.onSnapshot(FB.query(EVENTS_COL, FB.where("at", ">=", Date.now()-3*86400000)), {includeMetadataChanges:true}, onSnap, onErr));
+}
+/* Lettura COMPLETA una tantum: telefono nuovo / dati locali vuoti, oppure a richiesta
+   (tocco sulla pillola di sync). Costa ~1 lettura per schedina: non usarla di routine. */
+async function caricaTuttiEventi(){
+  if(!fbReady || !EVENTS_COL || !FB.getDocs) return false;
+  try{
+    const snap=await FB.getDocs(EVENTS_COL);
+    const srv=evDaSnapshot(snap), ids=new Set(srv.map(e=>e&&e.id)), dele=state.deleted||{};
+    mergeEventsInto(srv);
+    // riconciliazione completa: le mie voci che il cloud non ha → le ripubblico
+    (state.events||[]).forEach(e=>{ if(e&&e.id && !ids.has(e.id) && !dele[e.id]) eventPush(e); });
+    conservaCampi(render);
+    return snap.size;
+  }catch(e){ console.warn("caricaTuttiEventi", e); return false; }
 }
 /* MIGRAZIONE (una tantum, sicurissima): sposto gli eventi dal vecchio array del
    documentone alla sottocollezione, POI svuoto l'array così il doc si sgonfia.
@@ -1826,7 +1918,7 @@ async function migrateEventsOnce(mainArray){
   try{
     for(let i=0;i<live.length;i+=400){
       const b=FB.writeBatch(fdb);
-      live.slice(i,i+400).forEach(e=> b.set(eventRef(e.id), e));
+      live.slice(i,i+400).forEach(e=> b.set(eventRef(e.id), evDoc(e)));
       await b.commit();
     }
     await FB.updateDoc(fdoc, { events: [] });        // tutte salvate nella sottocollezione → sgonfio il documentone
@@ -1868,6 +1960,22 @@ async function pullNow(){
 }
 document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible") pullNow(); });
 window.addEventListener("pageshow", pullNow);
+// Eventi alla riapertura: riprovo la coda e, se l'ascolto è vecchio (>2h), lo riparto
+// dalla finestra aggiornata (così una riconnessione non rilegge troppe schedine).
+document.addEventListener("visibilitychange", ()=>{
+  if(document.visibilityState!=="visible" || !fbReady || !EVENTS_COL) return;
+  outboxFlush();
+  if(Date.now()-evSubAt > 2*3600e3) subscribeEvents();
+});
+// Paracadute: tocco sulla pillola di sync → riscarico TUTTO il diario dal cloud
+document.querySelector(".sync").addEventListener("click", ()=>{
+  if(!fbReady) return;
+  askConfirm("Riscarico tutto il diario dal cloud. Serve solo se sull'altro telefono vedi voci che qui mancano.", async ()=>{
+    toast("Scarico il diario…");
+    const n=await caricaTuttiEventi();
+    toast(n===false ? "Non riesco a scaricare ora, riprova più tardi" : "Diario aggiornato ✓ ("+n+" voci)");
+  }, {title:"Aggiorna diario", yes:"Scarica tutto", danger:false});
+});
 /* Battito di lettura: finché l'app è APERTA in primo piano ritiro dal server ogni
    ~20s. Così il telefono che guarda si allinea da solo a ciò che c'è già sul cloud,
    SENZA bisogno di aprire l'altro telefono (l'ascoltatore in tempo reale su iOS a
@@ -1891,7 +1999,11 @@ function mergeUnion(local, server){
   out.numbers = byId(server.numbers, local.numbers).sort((a,b)=>b.at-a.at);   // numeri utili
   out.appts = byId(server.appts, local.appts).sort((a,b)=>a.at-b.at);         // appuntamenti (crescente: prima i più vicini)
   out.weighDone = uniq(server.weighDone, local.weighDone);
-  out.tabOrder = (server.tabOrder&&server.tabOrder.length)?server.tabOrder:(local.tabOrder||[]);
+  // Ordine schede: vince quello cambiato più di recente (prima vinceva SEMPRE il cloud,
+  // quindi ogni ▲▼ veniva annullato al primo salvataggio/lettura → "premo e non succede nulla")
+  const su=+server.tabOrderU||0, lu=+local.tabOrderU||0, sOk=server.tabOrder&&server.tabOrder.length;
+  if(lu>su || !sOk){ out.tabOrder=local.tabOrder||[]; out.tabOrderU=lu; }
+  else { out.tabOrder=server.tabOrder; out.tabOrderU=su; }
   // Liste: fondo le voci per id tenendo la versione con 'u' (updatedAt) più recente
   // → la spunta non torna indietro e si propaga tra i telefoni (niente rimbalzo).
   const lmeta={}, litems={};
@@ -1952,18 +2064,11 @@ async function initSync(){
         setTimeout(pullNow, 4000);   // l'ascoltatore è caduto: provo a ritirare dal server
       }
     );
-    // Ascoltatore in TEMPO REALE della sottocollezione eventi: ogni schedina aggiunta
-    // o tolta dall'altro telefono arriva qui subito (e include le mie scritture locali).
-    FB.onSnapshot(EVENTS_COL, {includeMetadataChanges:true},
-      (snap)=>{
-        const serverEvents = snap.docs.map(d=>d.data());
-        if(snap.metadata.fromCache && !serverEvents.length) return;   // ancora niente dal server
-        mergeEventsInto(serverEvents);
-        if(!snap.metadata.fromCache) healEvents(serverEvents);        // ripubblico eventuali miei eventi non ancora sul cloud
-        conservaCampi(render);
-      },
-      (err)=>{ console.warn("Sync eventi:", err); }
-    );
+    // Eventi: prima riprovo le mie scritture in coda (così l'ascolto vede già le mie
+    // versioni), poi ascolto in TEMPO REALE solo le schedine nuove/modificate.
+    outboxFlush();
+    if(!(state.events||[]).length) caricaTuttiEventi();   // telefono nuovo o dati locali vuoti → scarico tutto una volta
+    subscribeEvents();
   }catch(e){
     setConn("off","Sync non disponibile"); console.warn("Sync non attivo:", e);
     // Rete ballerina / import fallito: senza questo retry il telefono restava
