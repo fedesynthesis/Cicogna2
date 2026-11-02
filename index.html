@@ -206,6 +206,8 @@
   .ev .txt{flex:1;min-width:0}
   .ev .txt b{font-family:'Quicksand';font-weight:600;font-size:15px}
   .ev .txt span{display:block;font-size:12.5px;color:var(--ink-soft)}
+  .vxcode{font-family:'Inter',monospace;font-weight:600;font-size:12px;background:rgba(0,0,0,.05);padding:1px 6px;border-radius:6px;letter-spacing:.3px}
+  .vxnext{font-weight:600;color:var(--cat,#45589c)} .vxnext.scad{color:#b24242}
   .ev .time{font-family:'Quicksand';font-weight:600;font-size:14px;color:var(--ink-soft);flex:none;display:flex;flex-direction:column;align-items:flex-end;line-height:1.15}
   .ev .time .ago{font-family:'Inter',sans-serif;font-weight:500;font-size:10.5px;color:var(--ink-soft);opacity:.65;margin-top:2px;white-space:nowrap}
   .ev .time .ago.now{color:var(--cat,var(--sage));opacity:.95;font-weight:600}
@@ -614,11 +616,12 @@ function openEvent(type, id, catId){
     const d=new Date(e.at);
     draft={ id:e.id, type:e.type, catId:e.catId||null, kind:e.kind||"pipi", mode:e.mode||"seno", side:e.side||"sx",
             amount:e.amount||null, stato:e.stato||null, dove:e.dove||null, min:e.min||"", ml:e.ml||"", cm:e.cm||"", note:e.note||"",
+            desc:e.desc||"", code:e.code||"", next:(e.next?dayKey(e.next):""),
             date: d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"),
             time: String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0") };
   } else {
     draft={ type:type, catId:catId||null, kind:"pipi", mode:"seno", side:"sx", date:n.date, time:n.time,
-            stato:(type==="bath"?"totale":null), dove:null, ml:"", cm:"", note:(catId==="vitd"?"2 gocce":"") };
+            stato:(type==="bath"?"totale":null), dove:null, ml:"", cm:"", desc:"", code:"", next:"", note:(catId==="vitd"?"2 gocce":"") };
   }
   renderSheetEvent();
   document.getElementById("scrim").classList.add("on");
@@ -628,8 +631,8 @@ function closeSheet(){ document.getElementById("scrim").classList.remove("on"); 
 function renderSheetEvent(){
   const f=draft, s=document.getElementById("sheet");
   const cTab = f.type==="custom" ? ((state.customTabs||[]).find(t=>t.id===f.catId)||{name:"Scheda"}) : null;
-  const titolo = (f.id?"Modifica ":"") + (f.type==="diaper" ? "cambio" : f.type==="feed" ? "poppata" : f.type==="cord" ? "medicazione" : f.type==="bath" ? "bagnetto" : f.type==="pump" ? "tiralatte" : f.type==="length" ? "altezza" : f.type==="foot" ? "lunghezza piede" : f.type==="custom" ? (cTab.name||"voce").toLowerCase() : "vomito");
-  const hint   = f.type==="diaper" ? "Cosa ha fatto" : f.type==="feed" ? "Come ha mangiato" : f.type==="cord" ? "Cordone ombelicale" : f.type==="bath" ? "Totale nella vaschetta, o parziale a pezzi" : f.type==="pump" ? "Lato e quantità tirata" : f.type==="length" ? "Lunghezza misurata del bambino" : f.type==="foot" ? "Lunghezza del piedino misurata" : f.type==="custom" ? "Quando è stato" : "Quando è successo";
+  const titolo = (f.id?"Modifica ":"") + (f.type==="diaper" ? "cambio" : f.type==="feed" ? "poppata" : f.type==="cord" ? "medicazione" : f.type==="bath" ? "bagnetto" : f.type==="pump" ? "tiralatte" : f.type==="length" ? "altezza" : f.type==="foot" ? "lunghezza piede" : f.type==="vax" ? "vaccino" : f.type==="custom" ? (cTab.name||"voce").toLowerCase() : "vomito");
+  const hint   = f.type==="diaper" ? "Cosa ha fatto" : f.type==="feed" ? "Come ha mangiato" : f.type==="cord" ? "Cordone ombelicale" : f.type==="bath" ? "Totale nella vaschetta, o parziale a pezzi" : f.type==="pump" ? "Lato e quantità tirata" : f.type==="length" ? "Lunghezza misurata del bambino" : f.type==="foot" ? "Lunghezza del piedino misurata" : f.type==="vax" ? "Vaccino fatto, codice ed eventuale richiamo" : f.type==="custom" ? "Quando è stato" : "Quando è successo";
 
   let campi="";
   if(f.type==="diaper"){
@@ -677,6 +680,9 @@ function renderSheetEvent(){
     campi = '<div class="lbl">Lunghezza</div><div class="fld"><input id="lcm" type="number" inputmode="decimal" step="0.1" placeholder="es. 52" value="'+(f.cm||"")+'"><span class="u">cm</span></div>';
   } else if(f.type==="foot"){
     campi = '<div class="lbl">Lunghezza piede</div><div class="fld"><input id="fcm" type="number" inputmode="decimal" step="0.1" placeholder="es. 8,5" value="'+(f.cm||"")+'"><span class="u">cm</span></div>';
+  } else if(f.type==="vax"){
+    campi = '<div class="lbl">Vaccino</div><div class="fld"><input id="vxdesc" type="text" placeholder="es. Esavalente" value="'+esc(f.desc||"")+'"></div>'
+      + '<div class="lbl">Codice / lotto</div><div class="fld"><input id="vxcode" type="text" placeholder="facoltativo, es. AB1234" value="'+esc(f.code||"")+'"></div>';
   } else if(f.type==="custom"){
     campi = "";
   } else {
@@ -691,6 +697,7 @@ function renderSheetEvent(){
     + '<div class="lbl">Giorno e ora</div>'
     + '<div class="opts"><div class="fld" style="flex:1.4"><input id="edate" type="date" value="'+f.date+'"></div>'
     + '<div class="fld" style="flex:1"><input id="etime" type="time" value="'+f.time+'"></div></div>'
+    + (f.type==="vax" ? '<div class="lbl">Prossima dose / richiamo</div><div class="fld"><input id="vxnext" type="date" value="'+(f.next||"")+'"></div>' : '')
     + '<div class="lbl">Nota</div><div class="fld"><input id="enote" type="text" placeholder="facoltativa" value="'+esc(f.type==="feed"?"":(f.note||""))+'"></div>'
     + '<button class="go" id="ego">'+(f.id?"Salva modifiche":"Registra")+'</button>'
     + '<button class="cancel" id="ecancel">Annulla</button>';
@@ -723,10 +730,17 @@ function renderSheetEvent(){
     else if(draft.type==="pump"){ const ml=s.querySelector("#pml"); ev.side=draft.side||null; ev.ml=ml?(parseInt(ml.value,10)||null):null; }
     else if(draft.type==="length"){ const cm=s.querySelector("#lcm"); ev.cm=cm?(parseFloat(String(cm.value).replace(",","."))||null):null; }
     else if(draft.type==="foot"){ const cm=s.querySelector("#fcm"); ev.cm=cm?(parseFloat(String(cm.value).replace(",","."))||null):null; }
+    else if(draft.type==="vax"){
+      const de=s.querySelector("#vxdesc"), co=s.querySelector("#vxcode"), nx=s.querySelector("#vxnext");
+      ev.desc=(de&&de.value.trim())||null;
+      ev.code=(co&&co.value.trim())||null;
+      ev.next=(nx&&nx.value) ? new Date(nx.value+"T12:00").getTime() : null;
+    }
     else if(draft.type==="custom"){ ev.catId=draft.catId||null; }
     else { ev.amount=draft.amount||null; }
     if(ev.type==="length" && ev.cm==null){ toast("Scrivi l'altezza in cm"); return; }
     if(ev.type==="foot" && ev.cm==null){ toast("Scrivi la lunghezza del piede in cm"); return; }
+    if(ev.type==="vax" && !ev.desc){ toast("Scrivi quale vaccino"); return; }
     const modifica = !!draft.id;
     if(modifica){ ev.id=draft.id; state.events=state.events.map(x=> x.id===draft.id ? ev : x); }
     else { state.events.unshift(ev); }
@@ -814,7 +828,9 @@ function renderBebe(){
     { k:"length", emoji:"📏", titolo:"Altezza",  oggi:null,    righe:ev.filter(e=>e.type==="length"),
       bg:"#d4e8e4", fg:"#2f736a" },
     { k:"foot",   emoji:"👣", titolo:"Lungh. piede", oggi:null, righe:ev.filter(e=>e.type==="foot"),
-      bg:"#e0e0f3", fg:"#565a9c" }
+      bg:"#e0e0f3", fg:"#565a9c" },
+    { k:"vax",    emoji:"💉", titolo:"Vaccini",  oggi:null,    righe:ev.filter(e=>e.type==="vax"),
+      bg:"#dce3f2", fg:"#45589c" }
   ];
   const _oi = k => { const i=(state.tabOrder||[]).indexOf(k); return i<0?999:i; };
   SCHEDE.sort((a,b)=> _oi(a.k)-_oi(b.k));   // ordine scelto da noi (le nuove restano in coda)
@@ -826,7 +842,7 @@ function renderBebe(){
       + '<button class="tile-add" data-qadd="'+x.k+'" aria-label="Registra '+esc(x.titolo)+'">+</button>'
       + '<span class="ic">'+x.emoji+'</span>'
       + '<span class="ti">'+x.titolo+'</span>'
-      + '<span class="nm">'+(x.k==="weight" ? (w.length?fmtKg(w[0].kg)+" kg":"—") : (x.k==="length"||x.k==="foot") ? (x.righe.length?x.righe[0].cm+" cm":"—") : (x.oggi?x.oggi+" oggi":"—"))+'</span>'
+      + '<span class="nm">'+(x.k==="weight" ? (w.length?fmtKg(w[0].kg)+" kg":"—") : (x.k==="length"||x.k==="foot") ? (x.righe.length?x.righe[0].cm+" cm":"—") : x.k==="vax" ? (x.righe.length?x.righe.length+(x.righe.length===1?" dose":" dosi"):"—") : (x.oggi?x.oggi+" oggi":"—"))+'</span>'
       + '</div>';
   });
   h += '<button class="scheda addtab" id="addtabbtn"><span class="ic">＋</span><span class="ti">Aggiungi</span><span class="nm">scheda</span></button>';
@@ -842,6 +858,7 @@ function renderBebe(){
       + '<div class="card-title"><h2>'+x.titolo+'</h2><div class="meta">'
       + (x.k==="weight" ? (w.length? w.length+" pesate · ultima "+fmtDate(w[0].at) : "nessuna pesata")
          : (x.k==="length"||x.k==="foot") ? (x.righe.length? x.righe.length+" misure · ultima "+fmtDate(x.righe[0].at) : "nessuna misura")
+         : x.k==="vax" ? (x.righe.length? (function(){ var p=x.righe.filter(e=>e.next&&e.next>=Date.now()).sort((a,b)=>a.next-b.next)[0]; return x.righe.length+" fatt"+(x.righe.length===1?"o":"i")+(p?" · prossimo richiamo "+fmtDate(p.next):""); })() : "nessun vaccino segnato")
                         : (x.righe.length? x.righe.length+" in tutto · "+(x.oggi||0)+" oggi" : "ancora niente"))
       + '</div></div>'
       + '<button class="card-del" id="reordbtn" aria-label="Ordina schede" style="font-size:15px">↕</button>'
@@ -909,8 +926,8 @@ function renderBebe(){
           const e=x.righe[gi];
           let tit;
           const prevEv=x.righe[gi+1];   // precedente (più vecchia) della stessa categoria
-          const gap = prevEv ? '<span class="ago">⏱ '+durata(e.at-prevEv.at)+'</span>' : '';
-          const daOra = (gi===0) ? '<span class="ago now" data-ago="'+e.at+'">'+faAdesso(e.at)+'</span>' : '';
+          const gap = (prevEv && e.type!=="vax") ? '<span class="ago">⏱ '+durata(e.at-prevEv.at)+'</span>' : '';
+          const daOra = (gi===0 && e.type!=="vax") ? '<span class="ago now" data-ago="'+e.at+'">'+faAdesso(e.at)+'</span>' : '';
           if(e.type==="feed")       tit=(e.mode==="seno"?"🤱 ":e.mode==="solido"?"🥄 ":"🍼 ")+feedText(e);
           else if(e.type==="diaper"&&!e.kind) tit="🧷 Cambio";   // cambio senza tipo (es. dal Watch)
           else if(e.type==="vomit") tit="Vomito"+(e.amount?" · "+e.amount:"");
@@ -919,10 +936,14 @@ function renderBebe(){
           else if(e.type==="pump"){ const L=e.side==="dx"?"Destro":e.side==="due"?"Entrambi":e.side==="sx"?"Sinistro":""; tit="🥛 "+(L||"Tiralatte")+(e.ml?" · "+e.ml+" ml":""); }
           else if(e.type==="length") tit="📏 "+(e.cm?e.cm+" cm":"misura");
           else if(e.type==="foot") tit="👣 "+(e.cm?e.cm+" cm":"misura");
+          else if(e.type==="vax") tit="💉 "+esc(e.desc||"Vaccino")+(e.code?' · <span class="vxcode">'+esc(e.code)+'</span>':'');
           else if(e.type==="custom") tit=(e.note?e.note:"Registrato");
           else                      tit=(KINDS[e.kind]||KINDS.pipi).e+" "+(KINDS[e.kind]||KINDS.pipi).t;
+          let subHTML="";
+          if(e.type==="vax"){ const pz=[]; if(e.next) pz.push('<b class="vxnext'+(e.next<Date.now()?" scad":"")+'">🔔 richiamo '+fmtDate(e.next)+'</b>'); if(e.note) pz.push(esc(e.note)); if(pz.length) subHTML='<span>'+pz.join(" · ")+'</span>'; }
+          else if(e.note && e.type!=="custom") subHTML='<span>'+esc(e.note)+'</span>';
           h += '<div class="ev tocca" data-edit="'+e.id+'"><div class="dot">'+dayShort(e.at)+'</div>'
-            + '<div class="txt"><b>'+tit+'</b>'+((e.note && e.type!=="custom")?'<span>'+esc(e.note)+'</span>':'')+'</div>'
+            + '<div class="txt"><b>'+tit+'</b>'+subHTML+'</div>'
             + '<div class="time">'+hhmm(e.at)+daOra+gap+'</div>'
             + '<button class="del" data-del="'+e.id+'">🗑</button></div>';
         });
@@ -1344,7 +1365,8 @@ function currentTabList(){
     {k:"bath",emoji:"🛁",name:"Bagnetto"},
     {k:"pump",emoji:"🥛",name:"Tiralatte"},
     {k:"length",emoji:"📏",name:"Altezza"},
-    {k:"foot",emoji:"👣",name:"Lungh. piede"}
+    {k:"foot",emoji:"👣",name:"Lungh. piede"},
+    {k:"vax",emoji:"💉",name:"Vaccini"}
   ];
   (state.customTabs||[]).filter(t=> !t.from || today>=t.from).forEach(t=> list.push({k:"c_"+t.id, emoji:t.emoji||"⭐", name:t.name||"Scheda"}));
   list.push({k:"weight",emoji:"⚖️",name:"Peso"});
