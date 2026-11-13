@@ -2206,9 +2206,7 @@ async function startGate(){
   AUTHM.onAuthStateChanged(auth, (user)=>{
     gateUser=user;
     if(!user){ gateShow("gLogin"); return; }
-    const who=document.getElementById("gLockWho"); if(who) who.textContent=(user.email||"")+"";
-    if(!hasPin()){ gateShow("gSetup"); }        // primo accesso su questo telefono
-    else { prepareLock(); gateShow("gLock"); }
+    unlock();   // già loggato: si entra diretti. La password si mette una volta sola, niente PIN/Face a ogni apertura.
   });
 }
 function prepareLock(){
