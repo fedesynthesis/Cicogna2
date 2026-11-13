@@ -404,14 +404,14 @@
       #splash{position:fixed;inset:0;z-index:10000;display:grid;place-items:center;
         background:linear-gradient(180deg,var(--bg),var(--bg2));transition:opacity .5s ease}
       #splash.via{opacity:0;pointer-events:none}
-      .splash-egg{position:relative;width:64vmin;height:64vmin;max-width:360px;max-height:360px;
-        display:grid;place-items:center}
+      .splash-egg{position:relative;width:100%;height:100%;display:grid;place-items:center}
       .splash-egg .egg,.splash-egg .chick{position:absolute;inset:0;display:grid;place-items:center;
-        font-size:42vmin;line-height:1}
-      .splash-egg .egg{animation:eggShake 2.6s ease-in-out infinite;transform-origin:50% 72%}
-      .splash-egg .chick{animation:chickHatch 2.6s ease-in-out infinite;transform-origin:50% 72%}
-      @keyframes hatchGlowBig{0%,46%{box-shadow:0 0 0 0 rgba(79,162,105,0)}56%{box-shadow:0 0 0 22px rgba(79,162,105,.16)}72%,100%{box-shadow:0 0 0 40px rgba(79,162,105,0)}}
-      @media (prefers-reduced-motion:reduce){ .splash-egg,.splash-egg .egg,.splash-egg .chick{animation:none} .splash-egg .egg{opacity:0} }
+        font-size:min(84vw,74vh);line-height:1}
+      .splash-egg .egg{animation:splashEgg 2.6s ease-in-out forwards;transform-origin:50% 72%}
+      .splash-egg .chick{animation:splashChick 2.6s ease-in-out forwards;transform-origin:50% 72%}
+      @keyframes splashEgg{0%,8%{transform:rotate(0);opacity:1}14%{transform:rotate(-9deg)}22%{transform:rotate(9deg)}30%{transform:rotate(-9deg)}38%{transform:rotate(7deg)}44%{transform:rotate(0);opacity:1}52%{opacity:0;transform:scale(1.15)}100%{opacity:0}}
+      @keyframes splashChick{0%,48%{opacity:0;transform:translateY(12px) scale(.5)}54%{opacity:1;transform:translateY(0) scale(1.15)}60%{transform:scale(.97)}66%{transform:scale(1.04)}100%{opacity:1;transform:scale(1)}}
+      @media (prefers-reduced-motion:reduce){ .splash-egg .egg,.splash-egg .chick{animation:none} .splash-egg .egg{opacity:0} }
     </style>
     <div class="splash-egg"><span class="egg">🥚</span><span class="chick">🐣</span></div>
   </div>
@@ -2234,7 +2234,7 @@ async function startGate(){
   // aggancio i pulsanti una volta sola
   if(!startGate._wired){ startGate._wired=true; wireGate(); }
   // lo splash resta finché l'uovo non si è schiuso (un ciclo intero), poi si entra
-  setTimeout(()=>{ splashTimerDone=true; maybeFinishSplash(); }, 2300);
+  setTimeout(()=>{ splashTimerDone=true; maybeFinishSplash(); }, 3200);
   let auth;
   try{ auth = await ensureAuth(); }
   catch(e){ authResolved=true; authUser=null; gateErr("gLoginErr","Connessione non riuscita, riprova."); maybeFinishSplash(); return; }
