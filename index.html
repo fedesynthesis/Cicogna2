@@ -398,6 +398,24 @@
 </style>
 </head>
 <body>
+  <!-- ======= Splash a tutto schermo in apertura (uovo che si schiude) ======= -->
+  <div id="splash">
+    <style>
+      #splash{position:fixed;inset:0;z-index:10000;display:grid;place-items:center;
+        background:linear-gradient(180deg,var(--bg),var(--bg2));transition:opacity .5s ease}
+      #splash.via{opacity:0;pointer-events:none}
+      .splash-egg{position:relative;width:64vmin;height:64vmin;max-width:360px;max-height:360px;
+        display:grid;place-items:center}
+      .splash-egg .egg,.splash-egg .chick{position:absolute;inset:0;display:grid;place-items:center;
+        font-size:42vmin;line-height:1}
+      .splash-egg .egg{animation:eggShake 2.6s ease-in-out infinite;transform-origin:50% 72%}
+      .splash-egg .chick{animation:chickHatch 2.6s ease-in-out infinite;transform-origin:50% 72%}
+      @keyframes hatchGlowBig{0%,46%{box-shadow:0 0 0 0 rgba(79,162,105,0)}56%{box-shadow:0 0 0 22px rgba(79,162,105,.16)}72%,100%{box-shadow:0 0 0 40px rgba(79,162,105,0)}}
+      @media (prefers-reduced-motion:reduce){ .splash-egg,.splash-egg .egg,.splash-egg .chick{animation:none} .splash-egg .egg{opacity:0} }
+    </style>
+    <div class="splash-egg"><span class="egg">🥚</span><span class="chick">🐣</span></div>
+  </div>
+
   <!-- ======= Accesso + blocco (copre tutto finché non si entra) ======= -->
   <div id="gate" class="gate">
     <style>
@@ -2204,16 +2222,24 @@ function gateShow(view){
 function gateErr(id,msg){ const el=document.getElementById(id); if(el) el.textContent=msg||""; }
 
 /* --- avvio: decide login / setup / sblocco --- */
+let splashTimerDone=false, authResolved=false, authUser=null, splashDone=false;
+function maybeFinishSplash(){
+  if(splashDone || !splashTimerDone || !authResolved) return;   // aspetto SIA l'animazione SIA l'accesso
+  splashDone=true;
+  const sp=document.getElementById("splash");
+  if(sp){ sp.classList.add("via"); setTimeout(()=>{ if(sp.parentNode) sp.parentNode.removeChild(sp); }, 520); }
+  if(authUser) unlock(); else gateShow("gLogin");   // loggato → diario; altrimenti → login
+}
 async function startGate(){
   // aggancio i pulsanti una volta sola
   if(!startGate._wired){ startGate._wired=true; wireGate(); }
+  // lo splash resta finché l'uovo non si è schiuso (un ciclo intero), poi si entra
+  setTimeout(()=>{ splashTimerDone=true; maybeFinishSplash(); }, 2300);
   let auth;
   try{ auth = await ensureAuth(); }
-  catch(e){ gateShow("gLogin"); gateErr("gLoginErr","Connessione non riuscita, riprova."); return; }
+  catch(e){ authResolved=true; authUser=null; gateErr("gLoginErr","Connessione non riuscita, riprova."); maybeFinishSplash(); return; }
   AUTHM.onAuthStateChanged(auth, (user)=>{
-    gateUser=user;
-    if(!user){ gateShow("gLogin"); return; }
-    unlock();   // già loggato: si entra diretti. La password si mette una volta sola, niente PIN/Face a ogni apertura.
+    gateUser=user; authUser=user; authResolved=true; maybeFinishSplash();
   });
 }
 function prepareLock(){
