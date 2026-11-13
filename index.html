@@ -407,7 +407,13 @@
       .gate-card{width:100%;max-width:360px;background:var(--surface);border-radius:var(--r);
         box-shadow:var(--shadow-soft);padding:28px 22px;text-align:center}
       .gate-logo{width:64px;height:64px;margin:0 auto 10px;border-radius:20px;background:var(--sage-bg);
-        display:grid;place-items:center;font-size:34px}
+        display:grid;place-items:center;font-size:34px;
+        animation:nidoBreath 1.9s ease-in-out infinite, nidoGlow 1.9s ease-in-out infinite}
+      .gate-logo span{display:inline-block;animation:nidoRock 1.9s ease-in-out infinite;transform-origin:50% 70%}
+      @keyframes nidoBreath{0%,100%{transform:scale(1)}50%{transform:scale(1.09)}}
+      @keyframes nidoGlow{0%{box-shadow:0 0 0 0 rgba(79,162,105,.22)}70%,100%{box-shadow:0 0 0 16px rgba(79,162,105,0)}}
+      @keyframes nidoRock{0%,100%{transform:rotate(-6deg)}50%{transform:rotate(6deg)}}
+      @media (prefers-reduced-motion:reduce){ .gate-logo,.gate-logo span{animation:none} }
       .gate h2{font-family:'Quicksand';font-weight:700;font-size:22px;color:var(--ink);letter-spacing:-.4px}
       .gate .gate-sub{color:var(--ink-soft);font-size:13.5px;margin:4px 0 18px}
       .gate input{width:100%;border:1.5px solid var(--line);background:#fbfefc;border-radius:13px;
@@ -426,7 +432,7 @@
       .gate .ghint{color:var(--ink-soft);font-size:11.5px;margin-top:12px;line-height:1.4;opacity:.85}
     </style>
     <div class="gate-card">
-      <div class="gate-logo">🐣</div>
+      <div class="gate-logo"><span>🐣</span></div>
 
       <!-- vista: LOGIN (nascosta all'avvio: compare solo se serve davvero il login) -->
       <div id="gLogin" hidden>
