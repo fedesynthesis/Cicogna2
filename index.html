@@ -398,7 +398,87 @@
 </style>
 </head>
 <body>
+  <!-- ======= Accesso + blocco (copre tutto finché non si entra) ======= -->
+  <div id="gate" class="gate">
+    <style>
+      .gate{position:fixed;inset:0;z-index:9999;background:linear-gradient(180deg,var(--bg),var(--bg2));
+        display:grid;place-items:center;padding:24px;overflow:auto}
+      .gate[hidden]{display:none}
+      .gate-card{width:100%;max-width:360px;background:var(--surface);border-radius:var(--r);
+        box-shadow:var(--shadow-soft);padding:28px 22px;text-align:center}
+      .gate-logo{width:64px;height:64px;margin:0 auto 10px;border-radius:20px;background:var(--sage-bg);
+        display:grid;place-items:center;font-size:34px}
+      .gate h2{font-family:'Quicksand';font-weight:700;font-size:22px;color:var(--ink);letter-spacing:-.4px}
+      .gate .gate-sub{color:var(--ink-soft);font-size:13.5px;margin:4px 0 18px}
+      .gate input{width:100%;border:1.5px solid var(--line);background:#fbfefc;border-radius:13px;
+        padding:13px 14px;font-size:16px;color:var(--ink);margin-bottom:10px;font-family:'Inter'}
+      .gate input:focus{outline:none;border-color:var(--sage-soft)}
+      .gate .gbtn{width:100%;border:none;cursor:pointer;background:var(--sage);color:#fff;border-radius:13px;
+        padding:14px;font-family:'Quicksand';font-weight:700;font-size:15.5px;box-shadow:var(--shadow-soft);margin-top:4px}
+      .gate .gbtn:active{transform:scale(.98)}
+      .gate .gbtn.ghost{background:var(--sage-bg);color:var(--sage);box-shadow:none}
+      .gate .gbtn[disabled]{opacity:.55}
+      .gate .glink{background:none;border:none;color:var(--ink-soft);font-size:13px;cursor:pointer;
+        margin-top:14px;text-decoration:underline;font-family:'Inter'}
+      .gate .gsep{display:flex;align-items:center;gap:10px;color:var(--ink-soft);font-size:12px;margin:14px 0}
+      .gate .gsep::before,.gate .gsep::after{content:"";flex:1;height:1px;background:var(--line)}
+      .gate .gerr{color:#c0564a;font-size:13px;min-height:18px;margin-top:10px}
+      .gate .ghint{color:var(--ink-soft);font-size:11.5px;margin-top:12px;line-height:1.4;opacity:.85}
+    </style>
+    <div class="gate-card">
+      <div class="gate-logo">🐣</div>
+
+      <!-- vista: LOGIN -->
+      <div id="gLogin">
+        <h2>Nido</h2>
+        <p class="gate-sub">Accedi per vedere il diario di Gabri</p>
+        <input id="gEmail" type="email" placeholder="Email" autocomplete="username" inputmode="email">
+        <input id="gPass" type="password" placeholder="Password" autocomplete="current-password">
+        <button id="gLoginBtn" class="gbtn">Entra</button>
+        <div id="gLoginErr" class="gerr"></div>
+        <div class="ghint">Solo gli accessi di mamma e papà possono aprire il diario.</div>
+      </div>
+
+      <!-- vista: CREA PIN (primo accesso su questo telefono) -->
+      <div id="gSetup" hidden>
+        <h2>Proteggi il diario</h2>
+        <p class="gate-sub">Scegli un PIN per sbloccare in fretta su questo telefono</p>
+        <input id="gNewPin" type="password" inputmode="numeric" placeholder="Nuovo PIN (almeno 4 cifre)" maxlength="12">
+        <input id="gNewPin2" type="password" inputmode="numeric" placeholder="Ripeti il PIN" maxlength="12">
+        <button id="gSetPinBtn" class="gbtn">Salva PIN</button>
+        <div id="gSetupErr" class="gerr"></div>
+      </div>
+
+      <!-- vista: OFFRI FACE ID (dopo aver creato il PIN) -->
+      <div id="gFaceOffer" hidden>
+        <h2>Sblocco rapido</h2>
+        <p class="gate-sub">Vuoi sbloccare con il Face ID di questo telefono?</p>
+        <button id="gFaceOnBtn" class="gbtn">Attiva Face ID</button>
+        <button id="gFaceSkipBtn" class="gbtn ghost">No, uso solo il PIN</button>
+        <div id="gFaceOfferErr" class="gerr"></div>
+      </div>
+
+      <!-- vista: SBLOCCO -->
+      <div id="gLock" hidden>
+        <h2>Bentornato</h2>
+        <p class="gate-sub" id="gLockWho">Sblocca il diario</p>
+        <button id="gFaceBtn" class="gbtn" hidden>🔓 Sblocca con Face ID</button>
+        <div id="gPinWrap">
+          <input id="gPin" type="password" inputmode="numeric" placeholder="PIN" maxlength="12">
+          <button id="gPinBtn" class="gbtn ghost">Sblocca con PIN</button>
+        </div>
+        <div id="gLockErr" class="gerr"></div>
+        <button id="gLogout" class="glink">Esci da questo accesso</button>
+      </div>
+    </div>
+  </div>
+
   <div class="wrap">
+    <div id="importBanner" style="display:none;max-width:560px;margin:10px auto 0;padding:14px 16px;background:var(--sage-bg);border:1.5px solid var(--sage-soft);border-radius:16px;text-align:center">
+      <div style="font-family:'Quicksand';font-weight:700;color:var(--ink);font-size:14.5px">Travasa i dati dal vecchio Nido</div>
+      <div id="importMsg" style="color:var(--ink-soft);font-size:12.5px;margin:4px 0 10px">Poppate, pesi e foto nella cassaforte nuova. Si fa una volta sola.</div>
+      <button id="importBtn" style="border:none;cursor:pointer;background:var(--sage);color:#fff;border-radius:11px;padding:10px 20px;font-family:'Quicksand';font-weight:700;font-size:13.5px">Importa ora</button>
+    </div>
     <header>
       <div class="logo"><svg viewBox="0 0 170 150" width="40" height="35" aria-hidden="true">
         <defs>
@@ -1713,13 +1793,15 @@ document.getElementById("scrim").onclick=(e)=>{ if(e.target.id==="scrim") closeS
 
 /* ============ Sync (documento separato da Cicogna) ============ */
 const FB_CONFIG={
-  apiKey:            "AIzaSyDLbGyLrPaw3tQXY3HOaTxWJLnOWPUjvXU",
-  authDomain:        "cicogna-57ae0.firebaseapp.com",
-  projectId:         "cicogna-57ae0",
-  storageBucket:     "cicogna-57ae0.firebasestorage.app",
-  messagingSenderId: "1013139034396",
-  appId:             "1:1013139034396:web:4770893e05130ca600aad9"
+  apiKey:            "AIzaSyAaurSQoA3LNgwPWXThEVEqxxW06xvmn_I",
+  authDomain:        "nido-98495.firebaseapp.com",
+  projectId:         "nido-98495",
+  storageBucket:     "nido-98495.firebasestorage.app",
+  messagingSenderId: "548727937806",
+  appId:             "1:548727937806:web:4f01e3419c8416f7e1955f"
 };
+/* Accessi ammessi (regole Firestore): papà e mamma. Nessun altro entra. */
+const UID_AMMESSI=["6ES6pInUxxVVcPZDSdKzdeEbOgy1","uiDTv4KmsXWA8yIx0wbTeIELIt53"];
 /* Le regole del progetto autorizzano solo questo documento: ci scriviamo dentro i nostri
    campi SENZA toccare quelli della vecchia lista nascita (vedi merge:true più sotto). */
 const ROOM_COL="LL09Rb8OO0yjHQnJBsPCPSu1", ROOM_DOC="YXZm9MNsAFCNNQiTgQnU7LEg";
@@ -2020,12 +2102,211 @@ function mergeUnion(local, server){
   out.lists=Object.values(lmeta).map(m=> ({id:m.id, emoji:m.emoji, name:m.name, items:m.order.map(id=>litems[m.id][id])}));
   return out;
 }
+/* ============ Importazione una-tantum dal vecchio Nido (cicogna-57ae0) ============ */
+const OLD_CONFIG={ apiKey:"AIzaSyDLbGyLrPaw3tQXY3HOaTxWJLnOWPUjvXU", authDomain:"cicogna-57ae0.firebaseapp.com",
+  projectId:"cicogna-57ae0", storageBucket:"cicogna-57ae0.firebasestorage.app",
+  messagingSenderId:"1013139034396", appId:"1:1013139034396:web:4770893e05130ca600aad9" };
+async function importaDalVecchio(onProg){
+  if(!AUTH || !AUTH.currentUser) throw new Error("non-loggato");
+  const app = await ensureApp();
+  if(!FB) FB = await import("https://www.gstatic.com/firebasejs/12.17.0/firebase-firestore.js");
+  const nuovo = FB.getFirestore(app);
+  const oldApp = (APPM.getApps ? (APPM.getApps().find(a=>a.name==="old")||APPM.initializeApp(OLD_CONFIG,"old")) : APPM.initializeApp(OLD_CONFIG,"old"));
+  const vecchio = FB.getFirestore(oldApp);
+  const res={ doc:false, events:0, files:0 };
+  // 1) documento principale (campi dati; NON i token push né il vecchio campo events)
+  const mainSnap = await FB.getDoc(FB.doc(vecchio, ROOM_COL, ROOM_DOC));
+  if(mainSnap.exists()){
+    const d=mainSnap.data(); delete d.pushTokens; delete d.events;
+    await FB.setDoc(FB.doc(nuovo, ROOM_COL, ROOM_DOC), d, {merge:true}); res.doc=true;
+  }
+  if(onProg) onProg("Copio le voci del diario…", 0, 0);
+  // 2) eventi (sottocollezione): a gruppi di 400
+  const evs = await FB.getDocs(FB.collection(vecchio, ROOM_COL, ROOM_DOC, "events"));
+  const tot=evs.size; let batch=FB.writeBatch(nuovo), c=0;
+  for(const ds of evs.docs){
+    batch.set(FB.doc(nuovo, ROOM_COL, ROOM_DOC, "events", ds.id), ds.data());
+    c++; res.events++;
+    if(c>=400){ await batch.commit(); batch=FB.writeBatch(nuovo); c=0; if(onProg) onProg("Copio le voci del diario…", res.events, tot); }
+  }
+  if(c>0) await batch.commit();
+  if(onProg) onProg("Copio gli allegati…", res.events, tot);
+  // 3) allegati (nido_files)
+  const nf = await FB.getDocs(FB.collection(vecchio, "nido_files"));
+  let b2=FB.writeBatch(nuovo), c2=0;
+  for(const ds of nf.docs){ b2.set(FB.doc(nuovo,"nido_files",ds.id), ds.data()); c2++; res.files++;
+    if(c2>=400){ await b2.commit(); b2=FB.writeBatch(nuovo); c2=0; } }
+  if(c2>0) await b2.commit();
+  return res;
+}
+
+function mostraImportSeServe(){
+  const ib=document.getElementById("importBanner"); if(!ib) return;
+  let done=false; try{ done=localStorage.getItem("nido_import_done")==="1"; }catch(e){}
+  ib.style.display = "none"; /* import gia fatto: banner disattivato in produzione */
+}
+function wireImport(){
+  const btn=document.getElementById("importBtn"), msg=document.getElementById("importMsg"); if(!btn) return;
+  btn.onclick=async ()=>{
+    btn.disabled=true; btn.textContent="Importo…";
+    try{
+      const r=await importaDalVecchio((t,n,tot)=>{ if(msg) msg.textContent = tot ? (t+" "+n+"/"+tot) : t; });
+      try{ localStorage.setItem("nido_import_done","1"); }catch(e){}
+      if(msg) msg.textContent="Fatto! "+r.events+" voci e "+r.files+" allegati copiati ✓";
+      btn.textContent="Completato";
+      setTimeout(()=>{ const b=document.getElementById("importBanner"); if(b) b.style.display="none"; }, 5000);
+    }catch(e){
+      btn.disabled=false; btn.textContent="Riprova";
+      if(msg) msg.textContent = (e&&e.message==="non-loggato") ? "Devi prima accedere." : "Errore nell'importazione, riprova.";
+      console.warn("import", e);
+    }
+  };
+}
+wireImport();
+
+/* ============ Accesso (Firebase Auth) + blocco locale Face ID/PIN ============ */
+let FB_APP=null, AUTH=null, APPM=null, AUTHM=null, gateUser=null, syncStarted=false;
+async function ensureApp(){
+  if(FB_APP) return FB_APP;
+  APPM = await import("https://www.gstatic.com/firebasejs/12.17.0/firebase-app.js");
+  FB_APP = APPM.initializeApp(FB_CONFIG);
+  return FB_APP;
+}
+async function ensureAuth(){
+  if(AUTH) return AUTH;
+  const app = await ensureApp();
+  AUTHM = await import("https://www.gstatic.com/firebasejs/12.17.0/firebase-auth.js");
+  AUTH = AUTHM.getAuth(app);
+  try{ await AUTHM.setPersistence(AUTH, AUTHM.browserLocalPersistence); }catch(e){}
+  return AUTH;
+}
+/* --- utilità --- */
+async function sha256(s){ const b=await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+  return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join(""); }
+function bufToB64(buf){ return btoa(String.fromCharCode(...new Uint8Array(buf))); }
+function b64ToBuf(s){ return Uint8Array.from(atob(s), c=>c.charCodeAt(0)); }
+function hasPin(){ try{ return !!localStorage.getItem("nido_pin_hash"); }catch(e){ return false; } }
+function faceSaved(){ try{ return localStorage.getItem("nido_face_id"); }catch(e){ return null; } }
+const faceAvail = !!(window.PublicKeyCredential && navigator.credentials);
+
+/* --- viste del gate --- */
+function gateShow(view){
+  ["gLogin","gSetup","gFaceOffer","gLock"].forEach(id=>{ const el=document.getElementById(id); if(el) el.hidden=(id!==view); });
+  const g=document.getElementById("gate"); if(g) g.hidden=false;
+}
+function gateErr(id,msg){ const el=document.getElementById(id); if(el) el.textContent=msg||""; }
+
+/* --- avvio: decide login / setup / sblocco --- */
+async function startGate(){
+  // aggancio i pulsanti una volta sola
+  if(!startGate._wired){ startGate._wired=true; wireGate(); }
+  let auth;
+  try{ auth = await ensureAuth(); }
+  catch(e){ gateShow("gLogin"); gateErr("gLoginErr","Connessione non riuscita, riprova."); return; }
+  AUTHM.onAuthStateChanged(auth, (user)=>{
+    gateUser=user;
+    if(!user){ gateShow("gLogin"); return; }
+    const who=document.getElementById("gLockWho"); if(who) who.textContent=(user.email||"")+"";
+    if(!hasPin()){ gateShow("gSetup"); }        // primo accesso su questo telefono
+    else { prepareLock(); gateShow("gLock"); }
+  });
+}
+function prepareLock(){
+  const fb=document.getElementById("gFaceBtn");
+  if(fb) fb.hidden = !(faceAvail && faceSaved());
+}
+
+/* --- sblocca: toglie il gate e avvia la sync (una volta) --- */
+function unlock(){
+  const g=document.getElementById("gate"); if(g) g.hidden=true;
+  if(!syncStarted){ syncStarted=true; initSync(); }
+  try{ mostraImportSeServe(); }catch(e){}
+}
+
+/* --- Face ID (WebAuthn, autenticatore del dispositivo) --- */
+async function faceRegister(){
+  if(!faceAvail) throw new Error("no-webauthn");
+  const cred = await navigator.credentials.create({ publicKey:{
+    challenge: crypto.getRandomValues(new Uint8Array(32)),
+    rp:{ name:"Nido" },
+    user:{ id:new TextEncoder().encode((gateUser&&gateUser.uid)||"nido"), name:(gateUser&&gateUser.email)||"nido", displayName:"Nido" },
+    pubKeyCredParams:[{type:"public-key",alg:-7},{type:"public-key",alg:-257}],
+    authenticatorSelection:{ authenticatorAttachment:"platform", userVerification:"required", residentKey:"preferred" },
+    timeout:60000, attestation:"none"
+  }});
+  localStorage.setItem("nido_face_id", bufToB64(cred.rawId));
+}
+async function faceUnlock(){
+  const id=faceSaved(); if(!id) return false;
+  await navigator.credentials.get({ publicKey:{
+    challenge: crypto.getRandomValues(new Uint8Array(32)),
+    allowCredentials:[{ type:"public-key", id:b64ToBuf(id) }],
+    userVerification:"required", timeout:60000
+  }});
+  return true;   // se non lancia eccezioni, il dispositivo ha verificato il volto/impronta
+}
+
+/* --- aggancio pulsanti --- */
+function wireGate(){
+  const $=(id)=>document.getElementById(id);
+  // LOGIN
+  const doLogin=async ()=>{
+    const em=($("gEmail").value||"").trim(), pw=$("gPass").value||"";
+    if(!em||!pw){ gateErr("gLoginErr","Inserisci email e password."); return; }
+    $("gLoginBtn").disabled=true; gateErr("gLoginErr","");
+    try{ await AUTHM.signInWithEmailAndPassword(AUTH, em, pw); $("gPass").value=""; }
+    catch(e){
+      const c=(e&&e.code)||"";
+      gateErr("gLoginErr", /password|credential|invalid-login/.test(c) ? "Email o password sbagliata." :
+        c.includes("too-many") ? "Troppi tentativi, riprova tra poco." :
+        c.includes("network") ? "Niente rete, controlla la connessione." : "Accesso non riuscito.");
+    }finally{ $("gLoginBtn").disabled=false; }
+  };
+  $("gLoginBtn").onclick=doLogin;
+  $("gPass").addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
+  // CREA PIN
+  $("gSetPinBtn").onclick=async ()=>{
+    const a=$("gNewPin").value||"", b=$("gNewPin2").value||"";
+    if(a.length<4){ gateErr("gSetupErr","Il PIN deve avere almeno 4 cifre."); return; }
+    if(a!==b){ gateErr("gSetupErr","I due PIN non coincidono."); return; }
+    try{ localStorage.setItem("nido_pin_hash", await sha256(a)); }catch(e){}
+    $("gNewPin").value=""; $("gNewPin2").value=""; gateErr("gSetupErr","");
+    if(faceAvail){ gateShow("gFaceOffer"); } else { unlock(); }
+  };
+  // OFFRI FACE ID
+  $("gFaceOnBtn").onclick=async ()=>{
+    gateErr("gFaceOfferErr","");
+    try{ await faceRegister(); unlock(); }
+    catch(e){ gateErr("gFaceOfferErr","Face ID non attivato. Userai il PIN."); setTimeout(unlock,1200); }
+  };
+  $("gFaceSkipBtn").onclick=()=>unlock();
+  // SBLOCCO
+  $("gFaceBtn").onclick=async ()=>{
+    gateErr("gLockErr","");
+    try{ if(await faceUnlock()) unlock(); }
+    catch(e){ gateErr("gLockErr","Face ID non riuscito, usa il PIN."); }
+  };
+  const doPin=async ()=>{
+    const p=$("gPin").value||""; if(!p){ return; }
+    const ok=(await sha256(p))===(localStorage.getItem("nido_pin_hash")||"__");
+    if(ok){ $("gPin").value=""; gateErr("gLockErr",""); unlock(); }
+    else gateErr("gLockErr","PIN sbagliato.");
+  };
+  $("gPinBtn").onclick=doPin;
+  $("gPin").addEventListener("keydown",e=>{ if(e.key==="Enter") doPin(); });
+  // ESCI
+  $("gLogout").onclick=async ()=>{
+    try{ await AUTHM.signOut(AUTH); }catch(e){}
+    try{ localStorage.removeItem("nido_pin_hash"); localStorage.removeItem("nido_face_id"); }catch(e){}
+    location.reload();
+  };
+}
+
 async function initSync(){
   try{
     setConn("wait","Connessione…");
-    const appMod = await import("https://www.gstatic.com/firebasejs/12.17.0/firebase-app.js");
-    FB           = await import("https://www.gstatic.com/firebasejs/12.17.0/firebase-firestore.js");
-    const app = appMod.initializeApp(FB_CONFIG);
+    const app = await ensureApp();   // stessa app dell'accesso: l'utente è già autenticato
+    FB  = await import("https://www.gstatic.com/firebasejs/12.17.0/firebase-firestore.js");
     fdb = FB.getFirestore(app);
     fdoc = FB.doc(fdb, ROOM_COL, ROOM_DOC);
     EVENTS_COL = FB.collection(fdb, ROOM_COL, ROOM_DOC, "events");   // sottocollezione del diario
@@ -2391,7 +2672,7 @@ async function askNotif(){
 })();
 buildMacro();
 render();
-initSync();
+startGate();   // prima l'accesso + sblocco; initSync parte dopo, da unlock()
 /* ============ Documenti (salvati sul telefono, IndexedDB) ============ */
 let _docDB=null;
 function docDB(){ return new Promise((res,rej)=>{ if(_docDB) return res(_docDB);
