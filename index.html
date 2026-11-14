@@ -78,11 +78,16 @@
     background:var(--surface);color:var(--sage);font-family:'Quicksand';font-weight:700;font-size:15px;cursor:pointer}
   .docview{position:fixed;inset:0;z-index:400;background:#eef1ee;display:flex;flex-direction:column}
   .docview[hidden]{display:none}
-  .dv-bar{padding:calc(env(safe-area-inset-top) + 8px) 12px 8px;background:#fff;box-shadow:var(--shadow-soft);flex:none}
+  .dv-bar{padding:calc(env(safe-area-inset-top) + 8px) 12px 8px;background:#fff;box-shadow:var(--shadow-soft);flex:none;display:flex;align-items:center;justify-content:space-between;gap:10px}
   .dv-close{border:none;background:var(--sage);color:#fff;padding:9px 16px;border-radius:99px;font-family:'Quicksand';font-weight:700;font-size:14px;cursor:pointer}
-  .dv-body{flex:1;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;background:#dfe4e0}
-  .dv-center{min-height:100%;display:flex;align-items:center;justify-content:center;padding:10px}
-  .dv-center img{max-width:100%;height:auto}
+  .dv-zoom{display:flex;align-items:center;gap:6px}
+  .dv-zoom button{width:38px;height:38px;border:none;border-radius:50%;background:#eef1ee;color:var(--sage);font-size:22px;font-weight:700;line-height:1;cursor:pointer}
+  .dv-zoom button:disabled{opacity:.35}
+  .dv-zoom span{min-width:46px;text-align:center;font-size:13px;font-weight:600;color:var(--ink-soft);font-variant-numeric:tabular-nums}
+  .dv-body{flex:1;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;background:#dfe4e0;touch-action:pan-x pan-y}
+  .zoomwrap{box-sizing:border-box;width:100%}
+  .imgwrap{padding:10px}
+  .imgwrap img{display:block;width:100%;height:auto}
   .pdfwrap{padding:10px 8px 20px}
   .pdfwrap canvas{display:block;width:100%;height:auto;margin:0 auto 10px;background:#fff;box-shadow:0 1px 5px rgba(38,52,42,.18);border-radius:2px}
   .dv-msg{color:var(--ink-soft);padding:34px 24px;text-align:center;font-size:14.5px;line-height:1.5}
@@ -546,7 +551,7 @@
 
   <div class="scrim" id="scrim"><div class="sheet" id="sheet"></div></div>
   <div class="toast" id="toast"></div>
-  <div class="docview" id="docview" hidden><div class="dv-bar"><button class="dv-close" id="dvClose">✕ Chiudi</button></div><div class="dv-body" id="dvBody"></div></div>
+  <div class="docview" id="docview" hidden><div class="dv-bar"><button class="dv-close" id="dvClose">✕ Chiudi</button><div class="dv-zoom"><button id="dvZOut" aria-label="Rimpicciolisci">−</button><span id="dvZLab">100%</span><button id="dvZIn" aria-label="Ingrandisci">+</button></div></div><div class="dv-body" id="dvBody"></div></div>
   <input type="file" id="docInput" accept="application/pdf,image/*" hidden>
 
 <script>
@@ -2803,26 +2808,86 @@ function loadPdfjs(){
   });
   return _pdfjsReady;
 }
+/* --- Zoom nel visore (l'app blocca lo zoom di pagina: qui pizzico, doppio tocco e tasti −/+) --- */
+const DVZ={z:1, min:1, max:4};
+let _dvPdf=null, _dvTok=0, _dvRerenderT=null;
+function dvWrap(){ return document.querySelector("#dvBody .zoomwrap"); }
+function dvZoomUI(){ const l=document.getElementById("dvZLab"); if(l) l.textContent=Math.round(DVZ.z*100)+"%";
+  const a=document.getElementById("dvZOut"), b=document.getElementById("dvZIn");
+  if(a) a.disabled=DVZ.z<=DVZ.min+.01; if(b) b.disabled=DVZ.z>=DVZ.max-.01; }
+// porta lo zoom a z tenendo fermo il punto (cx,cy) dello schermo
+function dvSetZoom(z, cx, cy){
+  const body=document.getElementById("dvBody"), wrap=dvWrap(); if(!wrap) return;
+  z=Math.max(DVZ.min, Math.min(DVZ.max, z));
+  const r=body.getBoundingClientRect();
+  const px=(cx==null?body.clientWidth/2:cx-r.left), py=(cy==null?body.clientHeight/2:cy-r.top);
+  const k=z/DVZ.z, sx=(body.scrollLeft+px)*k-px, sy=(body.scrollTop+py)*k-py;
+  DVZ.z=z; wrap.style.width=(z*100)+"%";
+  body.scrollLeft=sx; body.scrollTop=sy;
+  dvZoomUI();
+}
+// dopo lo zoom ridisegno il PDF alla nuova risoluzione, così resta nitido
+function dvRerender(){ clearTimeout(_dvRerenderT); _dvRerenderT=setTimeout(()=>{ if(_dvPdf) renderPdfPages(); }, 250); }
+async function renderPdfPages(){
+  const body=document.getElementById("dvBody"), wrap=dvWrap(), doc=_dvPdf; if(!wrap||!doc) return;
+  const tok=++_dvTok;
+  const fitW=(body.clientWidth||window.innerWidth)-16;
+  const dpr=Math.min(window.devicePixelRatio||1, 2.5);
+  const budget=Math.min(12e6, 48e6/doc.numPages);          // pixel max per pagina (limiti memoria canvas iPhone)
+  for(let p=1;p<=doc.numPages;p++){
+    const page=await doc.getPage(p); if(tok!==_dvTok) return;
+    const v1=page.getViewport({scale:1});
+    const s=Math.min((fitW*DVZ.z/v1.width)*dpr, Math.sqrt(budget/(v1.width*v1.height)));
+    const vp=page.getViewport({scale:s});
+    const cv=document.createElement("canvas");
+    cv.width=Math.floor(vp.width); cv.height=Math.floor(vp.height);
+    await page.render({canvasContext:cv.getContext("2d"), viewport:vp}).promise;
+    if(tok!==_dvTok){ cv.width=cv.height=0; return; }
+    const old=wrap.children[p-1];
+    if(old){ wrap.replaceChild(cv, old); old.width=old.height=0; } else wrap.appendChild(cv);
+  }
+}
 async function renderPdf(url, body){
   body.innerHTML='<div class="dv-msg">Carico il documento…</div>';
   try{
     const pdfjs=await loadPdfjs();
     const doc=await pdfjs.getDocument(url).promise;
-    const wrap=document.createElement("div"); wrap.className="pdfwrap";
+    const wrap=document.createElement("div"); wrap.className="pdfwrap zoomwrap";
     body.innerHTML=""; body.appendChild(wrap);
-    const width=(body.clientWidth||window.innerWidth)-16;
-    const dpr=Math.min(window.devicePixelRatio||1, 2.5);
-    for(let p=1;p<=doc.numPages;p++){
-      const page=await doc.getPage(p);
-      const v1=page.getViewport({scale:1});
-      const vp=page.getViewport({scale:(width/v1.width)*dpr});
-      const cv=document.createElement("canvas");
-      cv.width=vp.width; cv.height=vp.height;
-      wrap.appendChild(cv);
-      await page.render({canvasContext:cv.getContext("2d"), viewport:vp}).promise;
-    }
+    _dvPdf=doc; dvZoomUI();
+    await renderPdfPages();
   }catch(e){ console.warn("pdf", e); body.innerHTML='<div class="dv-msg">Non riesco a mostrare questo PDF.<br>Riprova con la connessione attiva.</div>'; }
 }
+(function wireDocZoom(){
+  const body=document.getElementById("dvBody"); if(!body) return;
+  const dist=(a,b)=>Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY);
+  let pinch=null, wasPinch=false, tap=null, lastTap=null;
+  body.addEventListener("touchstart", e=>{
+    if(e.touches.length===2){ pinch={d:dist(e.touches[0],e.touches[1])||1, z:DVZ.z}; wasPinch=true; tap=null; e.preventDefault(); }
+    else if(e.touches.length===1 && !wasPinch){ const t=e.touches[0]; tap={x:t.clientX, y:t.clientY, t:Date.now()}; }
+  }, {passive:false});
+  body.addEventListener("touchmove", e=>{
+    if(pinch && e.touches.length===2){ e.preventDefault();
+      const a=e.touches[0], b=e.touches[1];
+      dvSetZoom(pinch.z*dist(a,b)/pinch.d, (a.clientX+b.clientX)/2, (a.clientY+b.clientY)/2); }
+    else if(tap && e.touches.length===1){ const t=e.touches[0]; if(Math.hypot(t.clientX-tap.x, t.clientY-tap.y)>10) tap=null; }
+  }, {passive:false});
+  body.addEventListener("touchend", e=>{
+    if(pinch && e.touches.length<2){ pinch=null; dvRerender(); }
+    if(e.touches.length===0){
+      if(!wasPinch && tap && Date.now()-tap.t<300){
+        const now=Date.now();
+        if(lastTap && now-lastTap.t<320 && Math.hypot(tap.x-lastTap.x, tap.y-lastTap.y)<30){
+          e.preventDefault(); dvSetZoom(DVZ.z>1.05?1:2.5, tap.x, tap.y); dvRerender(); lastTap=null;
+        } else lastTap={x:tap.x, y:tap.y, t:now};
+      }
+      wasPinch=false; tap=null;
+    }
+  }, {passive:false});
+  body.addEventListener("gesturestart", e=>e.preventDefault());
+  document.getElementById("dvZIn").addEventListener("click", ()=>{ dvSetZoom(DVZ.z*1.5); dvRerender(); });
+  document.getElementById("dvZOut").addEventListener("click", ()=>{ dvSetZoom(DVZ.z/1.5); dvRerender(); });
+})();
 async function viewDoc(id){
   let d=null; try{ d=await docGetOne(id); }catch(e){}
   let blob = d&&d.blob ? d.blob : null, type = d?d.type:"", name = d?d.name:"documento";
@@ -2841,12 +2906,15 @@ async function viewDoc(id){
   const url=URL.createObjectURL(blob), t=type||"";
   dv._url=url; dv.hidden=false;
   document.getElementById("scrim").classList.remove("on");
-  if(t.indexOf("image")===0){ body.innerHTML='<div class="dv-center"><img alt="'+esc(name)+'"></div>'; body.querySelector("img").src=url; }
+  DVZ.z=1; dvZoomUI();
+  if(t.indexOf("image")===0){ body.innerHTML='<div class="zoomwrap imgwrap"><img alt="'+esc(name)+'"></div>'; body.querySelector("img").src=url; }
   else if(t.indexOf("pdf")>-1){ renderPdf(url, body); }
   else { body.innerHTML='<div class="dv-msg">Anteprima non disponibile per questo tipo di file.</div>'; }
 }
 function closeDocView(){ const dv=document.getElementById("docview"); dv.hidden=true;
   if(dv._url){ try{ URL.revokeObjectURL(dv._url); }catch(e){} dv._url=null; }
+  _dvTok++; clearTimeout(_dvRerenderT); if(_dvPdf){ try{ _dvPdf.destroy(); }catch(e){} _dvPdf=null; } DVZ.z=1;
+  document.getElementById("dvBody").querySelectorAll("canvas").forEach(c=>{ c.width=c.height=0; });
   document.getElementById("dvBody").innerHTML=""; openDocs(); }
 
 /* ============ Numeri utili (condivisi tra i telefoni) ============ */
